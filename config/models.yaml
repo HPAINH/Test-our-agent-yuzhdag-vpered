@@ -1,0 +1,48 @@
+models:
+  gemma:
+    api_id: gemma-4-26b-a4b
+    title: Gemma 4 26B A4B
+    price_rub_per_1k_in: 0.02
+    price_rub_per_1k_out: 0.06
+  glm:
+    api_id: glm-5.3-flash
+    title: GLM-5.3-Flash
+    price_rub_per_1k_in: 0.05
+    price_rub_per_1k_out: 0.15
+  qwen:
+    api_id: qwen3.6-35b-a3b
+    title: Qwen3.6 35B A3B
+    price_rub_per_1k_in: 0.03
+    price_rub_per_1k_out: 0.09
+  deepseek:
+    api_id: deepseek-v4.1-flash
+    title: DeepSeek-V4.1-Flash
+    price_rub_per_1k_in: 0.04
+    price_rub_per_1k_out: 0.12
+  qwen_vl:
+    api_id: qwen3-vl-30b-a3b-instruct
+    title: Qwen3-VL-30B-A3B-Instruct
+    price_rub_per_1k_in: 0.04
+    price_rub_per_1k_out: 0.12
+  kimi:
+    api_id: kimi-k2.6
+    title: Kimi-K2.6
+    price_rub_per_1k_in: 0.06
+    price_rub_per_1k_out: 0.2
+
+routing:
+  classify: [gemma, qwen]
+  rerank: [gemma, qwen]
+  profile_summary: [qwen, glm]
+  planner: [qwen, glm]
+  analyst: [glm, deepseek]
+  related: [deepseek, glm]
+  verifier: [kimi, deepseek]
+  chat: [qwen, glm]
+  digest: [qwen, glm]
+  vision: [qwen_vl]
+
+budget:
+  warn_share: 0.8
+  economy_share: 0.95
+  economy_purposes: [classify, rerank]

@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: elbrus
+      POSTGRES_PASSWORD: elbrus
+      POSTGRES_DB: elbrus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elbrus"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: ${APP_IMAGE:-elbrus-news-insights:local}
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://elbrus:elbrus@db:5432/elbrus
+      SEED_ON_START: "true"
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./data:/srv/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    image: ${APP_IMAGE:-elbrus-news-insights:local}
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://elbrus:elbrus@db:5432/elbrus
+    volumes:
+      - ./data:/srv/data:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    profiles: ["worker"]
+
+volumes:
+  pgdata:

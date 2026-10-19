@@ -1,0 +1,391 @@
+{
+  "$defs": {
+    "Claim": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fact",
+            "bank",
+            "ai"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "factor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Factor"
+        },
+        "bank_product": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bank Product"
+        },
+        "bank_product_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bank Product Title"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "sources"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "Consequences": {
+      "properties": {
+        "risks": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Risks",
+          "type": "array"
+        },
+        "opportunities": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Opportunities",
+          "type": "array"
+        },
+        "watch_factors": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Watch Factors",
+          "type": "array"
+        }
+      },
+      "title": "Consequences",
+      "type": "object"
+    },
+    "Evidence": {
+      "properties": {
+        "features": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Features",
+          "type": "array"
+        },
+        "materials": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Materials",
+          "type": "array"
+        },
+        "alfa": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Alfa",
+          "type": "array"
+        }
+      },
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Sections": {
+      "properties": {
+        "what_happened": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "What Happened",
+          "type": "array"
+        },
+        "why_it_matters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Why It Matters",
+          "type": "array"
+        },
+        "consequences": {
+          "$ref": "#/$defs/Consequences",
+          "default": {
+            "risks": [],
+            "opportunities": [],
+            "watch_factors": []
+          }
+        },
+        "actions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "bank_view": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Bank View",
+          "type": "array"
+        },
+        "evidence": {
+          "$ref": "#/$defs/Evidence",
+          "default": {
+            "features": [],
+            "materials": [],
+            "alfa": []
+          }
+        }
+      },
+      "title": "Sections",
+      "type": "object"
+    },
+    "SourceRef": {
+      "properties": {
+        "type": {
+          "enum": [
+            "material",
+            "alfa",
+            "feature",
+            "claim",
+            "event"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "Verification": {
+      "properties": {
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "iterations": {
+          "title": "Iterations",
+          "type": "integer"
+        },
+        "issues": {
+          "default": [],
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "checks": {
+          "default": [],
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Checks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "passed",
+        "iterations"
+      ],
+      "title": "Verification",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "insight_id": {
+      "title": "Insight Id",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "company_id": {
+      "title": "Company Id",
+      "type": "string"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+    },
+    "relevance": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Relevance",
+      "type": "object"
+    },
+    "sections": {
+      "$ref": "#/$defs/Sections"
+    },
+    "factors": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Factors",
+      "type": "array"
+    },
+    "polarity": {
+      "default": "mixed",
+      "enum": [
+        "risk",
+        "opportunity",
+        "mixed"
+      ],
+      "title": "Polarity",
+      "type": "string"
+    },
+    "horizon": {
+      "default": "1-3m",
+      "title": "Horizon",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "verification": {
+      "$ref": "#/$defs/Verification"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "insufficient_data",
+        "not_relevant",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "missing": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "models": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Models",
+      "type": "object"
+    }
+  },
+  "required": [
+    "insight_id",
+    "event_id",
+    "company_id",
+    "role",
+    "title",
+    "sections",
+    "confidence",
+    "verification",
+    "status",
+    "trace_id",
+    "generated_at"
+  ],
+  "title": "InsightBody",
+  "type": "object"
+}

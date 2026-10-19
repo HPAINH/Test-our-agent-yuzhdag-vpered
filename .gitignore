@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+var/
+.env
+data/*
+!data/README.md
+ui/node_modules/
+ui/dist/
+eval/results.json

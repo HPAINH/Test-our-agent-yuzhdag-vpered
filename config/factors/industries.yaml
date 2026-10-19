@@ -1,0 +1,93 @@
+industries:
+  "24":
+    sector: metallurgy
+    name: Металлургия
+    factors: {cmd_metals: [0.8, mixed], cmd_coal: [0.4, risk], logistics: [0.4, risk], sanctions_trade: [0.3, risk], key_rate: [0.1, risk]}
+  "05":
+    sector: coal
+    name: Добыча угля
+    factors: {cmd_coal: [0.9, mixed], logistics: [0.5, risk], sanctions_trade: [0.4, risk]}
+  "06":
+    sector: oil_gas
+    name: Нефть и газ
+    factors: {cmd_oil: [0.9, mixed], regulation: [0.4, risk], sanctions_trade: [0.4, risk]}
+  "19":
+    sector: oil_gas
+    name: Нефтепереработка
+    factors: {cmd_oil: [0.8, mixed], regulation: [0.5, risk]}
+  "01":
+    sector: agro
+    name: Сельское хозяйство
+    factors: {cmd_agro: [0.8, mixed], regulation: [0.3, risk], logistics: [0.3, risk]}
+  "10":
+    sector: food
+    name: Пищевая промышленность
+    factors: {cmd_agro: [0.6, risk], consumer_demand: [0.5, mixed], inflation: [0.3, risk]}
+  "47":
+    sector: retail
+    name: Розничная торговля
+    factors: {consumer_demand: [0.8, mixed], inflation: [0.5, risk], labor: [0.3, risk], region: [0.2, mixed]}
+  "46.72":
+    sector: metals_trade
+    name: Оптовая торговля металлами
+    factors: {cmd_metals: [0.7, mixed], logistics: [0.4, risk], key_rate: [0.2, risk]}
+  "46":
+    sector: wholesale
+    name: Оптовая торговля
+    factors: {consumer_demand: [0.5, mixed], logistics: [0.4, risk], fx_cny: [0.2, risk]}
+  "41":
+    sector: construction
+    name: Строительство зданий
+    factors: {real_estate: [0.9, mixed], cmd_construction: [0.6, risk], key_rate: [0.3, risk], regulation: [0.3, risk]}
+  "42":
+    sector: construction
+    name: Инфраструктурное строительство
+    factors: {regulation: [0.4, mixed], cmd_metals: [0.3, risk], key_rate: [0.2, risk]}
+  "43":
+    sector: construction
+    name: Специализированные строительные работы
+    factors: {real_estate: [0.6, mixed], labor: [0.3, risk]}
+  "68":
+    sector: real_estate
+    name: Операции с недвижимостью
+    factors: {real_estate: [0.8, mixed], key_rate: [0.3, risk]}
+  "23":
+    sector: building_materials
+    name: Производство стройматериалов
+    factors: {cmd_construction: [0.8, mixed], real_estate: [0.5, mixed], cmd_coal: [0.3, risk], logistics: [0.3, risk]}
+  "49":
+    sector: transport
+    name: Сухопутный транспорт
+    factors: {logistics: [0.8, mixed], cmd_oil: [0.5, risk], regulation: [0.3, risk]}
+  "52":
+    sector: logistics
+    name: Складское хозяйство и логистика
+    factors: {logistics: [0.8, mixed], sanctions_trade: [0.3, mixed]}
+  "29":
+    sector: auto
+    name: Производство автомобилей
+    factors: {consumer_demand: [0.6, mixed], key_rate: [0.3, risk], sanctions_trade: [0.4, risk], cmd_metals: [0.3, risk]}
+  "45":
+    sector: auto_trade
+    name: Торговля автомобилями
+    factors: {consumer_demand: [0.7, mixed], key_rate: [0.3, risk], fx_cny: [0.4, risk]}
+  "62":
+    sector: it
+    name: Разработка ПО
+    factors: {labor: [0.6, risk], regulation: [0.4, mixed]}
+  "35":
+    sector: energy
+    name: Энергетика
+    factors: {regulation: [0.6, mixed], cmd_coal: [0.4, risk]}
+  "21":
+    sector: pharma
+    name: Фармацевтика
+    factors: {regulation: [0.5, mixed], fx_eur: [0.3, risk], fx_cny: [0.3, risk]}
+  "11":
+    sector: beverages
+    name: Производство напитков
+    factors: {consumer_demand: [0.6, mixed], regulation: [0.5, risk]}
+  "86":
+    sector: health
+    name: Здравоохранение
+    factors: {regulation: [0.5, mixed], labor: [0.4, risk]}

@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "SourceRef": {
+      "properties": {
+        "type": {
+          "enum": [
+            "material",
+            "alfa",
+            "feature",
+            "claim",
+            "event"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "fact",
+        "bank",
+        "ai"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceRef"
+      },
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    },
+    "factor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Factor"
+    },
+    "bank_product": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bank Product"
+    },
+    "bank_product_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bank Product Title"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "text",
+    "sources"
+  ],
+  "title": "Claim",
+  "type": "object"
+}

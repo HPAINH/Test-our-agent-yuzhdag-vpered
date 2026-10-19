@@ -1,0 +1,12 @@
+rss:
+  - {id: interfax, name: Интерфакс, url: "https://www.interfax.ru/rss.asp"}
+  - {id: rbc, name: РБК, url: "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"}
+  - {id: tass, name: ТАСС, url: "https://tass.ru/rss/v2.xml"}
+  - {id: kommersant, name: Коммерсантъ, url: "https://www.kommersant.ru/RSS/news.xml"}
+  - {id: cbr, name: Банк России, url: "https://www.cbr.ru/rss/eventrss"}
+  - {id: minfin, name: Минфин России, url: "https://minfin.gov.ru/ru/rss/"}
+
+fetch:
+  timeout_s: 10
+  max_bytes: 2000000
+  user_agent: "ElbrusNewsInsights/1.0 (hackathon prototype)"

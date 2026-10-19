@@ -1,0 +1,25 @@
+roles:
+  owner:
+    name: Собственник бизнеса
+    focus: Стоимость бизнеса, стратегия, конкуренты
+    multipliers: {consumer_demand: 1.5, regulation: 1.3, sanctions_trade: 1.5, real_estate: 1.2, labor: 0.7}
+  ceo:
+    name: Генеральный директор
+    focus: Операции, спрос, цепочка поставок
+    multipliers: {consumer_demand: 1.5, cmd_metals: 1.3, cmd_coal: 1.3, cmd_agro: 1.3, cmd_oil: 1.3, logistics: 1.5, real_estate: 1.3, bonds: 0.7}
+  cfo:
+    name: Финансовый директор
+    focus: Стоимость денег, маржа, бюджет
+    multipliers: {key_rate: 1.5, inflation: 1.5, fx_usd: 1.5, fx_cny: 1.5, fx_eur: 1.5, bonds: 1.2}
+  treasurer:
+    name: Руководитель казначейства
+    focus: Ликвидность, долг, валюта
+    multipliers: {key_rate: 1.5, fx_usd: 1.5, fx_cny: 1.5, fx_eur: 1.5, bonds: 1.5, consumer_demand: 0.7, labor: 0.7}
+  accountant:
+    name: Главный бухгалтер
+    focus: Налоги, отчётность, регуляторика
+    multipliers: {regulation: 1.8, labor: 1.2, cmd_metals: 0.7, cmd_coal: 0.7, cmd_agro: 0.7, bonds: 0.7}
+  other:
+    name: Иной руководитель
+    focus: Общая картина
+    multipliers: {}

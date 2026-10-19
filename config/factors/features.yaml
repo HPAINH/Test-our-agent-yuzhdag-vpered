@@ -1,0 +1,40 @@
+base:
+  key_rate: [0.15, risk]
+  inflation: [0.15, risk]
+  region: [0.25, mixed]
+
+feature_rules:
+  - {feature: CL_PRODUCT_LOA_MARK, value: true, factor: key_rate, add: 0.5, polarity: risk}
+  - {feature: CL_PRODUCT_LOA_MARK, value: true, factor: bonds, add: 0.2, polarity: risk}
+  - {feature: CL_PRODUCT_LEA_MARK, value: true, factor: key_rate, add: 0.2, polarity: risk}
+  - {feature: FACTORING_MARK, value: true, factor: key_rate, add: 0.2, polarity: risk}
+  - {feature: CL_PRODUCT_DEP_MARK, value: true, factor: key_rate, add: 0.3, polarity: opportunity}
+  - {feature: CL_PRODUCT_GAR_MARK, value: true, factor: regulation, add: 0.2, polarity: mixed}
+  - {feature: CL_PRODUCT_ZPP_MARK, value: true, factor: labor, add: 0.3, polarity: risk}
+  - {feature: FTS_FLAG, value: true, factor: sanctions_trade, add: 0.4, polarity: risk}
+  - {feature: FTS_FLAG, value: true, factor: logistics, add: 0.2, polarity: risk}
+
+workers_rules:
+  min_large: 1000
+  labor_add: 0.2
+  inflation_add: 0.1
+
+fts_currency:
+  Китай: fx_cny
+  Китайская Народная Республика: fx_cny
+  Гонконг: fx_cny
+  Германия: fx_eur
+  Италия: fx_eur
+  Франция: fx_eur
+  Нидерланды: fx_eur
+  default: fx_usd
+
+fts_currency_weight: 0.6
+
+counterparty:
+  min_share: 0.15
+  factor_scale: 0.5
+  top_n: 10
+  concentration_threshold: 0.30
+
+large_business_revenue_rub: 15000000000

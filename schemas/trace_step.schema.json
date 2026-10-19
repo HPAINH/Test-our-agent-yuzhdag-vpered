@@ -1,0 +1,80 @@
+{
+  "properties": {
+    "n": {
+      "title": "N",
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "plan",
+        "tool",
+        "llm",
+        "verify",
+        "retry",
+        "finalize",
+        "error"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "input_summary": {
+      "default": "",
+      "title": "Input Summary",
+      "type": "string"
+    },
+    "output_summary": {
+      "default": "",
+      "title": "Output Summary",
+      "type": "string"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
+    "tokens": {
+      "default": 0,
+      "title": "Tokens",
+      "type": "integer"
+    },
+    "cost_rub": {
+      "default": 0,
+      "title": "Cost Rub",
+      "type": "number"
+    },
+    "ms": {
+      "default": 0,
+      "title": "Ms",
+      "type": "integer"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "detail": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Detail",
+      "type": "object"
+    }
+  },
+  "required": [
+    "n",
+    "kind",
+    "name"
+  ],
+  "title": "TraceStep",
+  "type": "object"
+}

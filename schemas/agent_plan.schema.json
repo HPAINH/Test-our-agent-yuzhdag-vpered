@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "PlanStep": {
+      "properties": {
+        "n": {
+          "title": "N",
+          "type": "integer"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "args": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Args",
+          "type": "object"
+        },
+        "why": {
+          "default": "",
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "n",
+        "tool"
+      ],
+      "title": "PlanStep",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "goal": {
+      "title": "Goal",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PlanStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "expected_outputs": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Expected Outputs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "goal",
+    "steps"
+  ],
+  "title": "AgentPlan",
+  "type": "object"
+}

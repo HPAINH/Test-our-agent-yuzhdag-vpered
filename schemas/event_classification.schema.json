@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "FactorEffect": {
+      "properties": {
+        "factor": {
+          "title": "Factor",
+          "type": "string"
+        },
+        "direction": {
+          "default": "flat",
+          "enum": [
+            "up",
+            "down",
+            "flat"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "strength": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Strength",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "factor"
+      ],
+      "title": "FactorEffect",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "type": {
+      "default": "other",
+      "enum": [
+        "monetary",
+        "fx",
+        "commodity",
+        "regulation",
+        "sanctions",
+        "industry",
+        "company",
+        "macro_stat",
+        "other"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "factors": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/FactorEffect"
+      },
+      "title": "Factors",
+      "type": "array"
+    },
+    "okved_sections": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Okved Sections",
+      "type": "array"
+    },
+    "regions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Regions",
+      "type": "array"
+    },
+    "participants": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Participants",
+      "type": "array"
+    },
+    "dates": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Dates",
+      "type": "array"
+    },
+    "modality": {
+      "default": "fact",
+      "enum": [
+        "fact",
+        "forecast",
+        "opinion"
+      ],
+      "title": "Modality",
+      "type": "string"
+    },
+    "method": {
+      "default": "rules",
+      "title": "Method",
+      "type": "string"
+    },
+    "flags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+    }
+  },
+  "title": "EventClassification",
+  "type": "object"
+}

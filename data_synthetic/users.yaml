@@ -1,0 +1,30 @@
+users:
+- login: cfo_a
+  display_name: Ирина Соколова
+  company_id: U_DEMO_A
+  role: cfo
+  is_admin: true
+- login: treasury_a
+  display_name: Павел Ким
+  company_id: U_DEMO_A
+  role: treasurer
+- login: accountant_a
+  display_name: Елена Громова
+  company_id: U_DEMO_A
+  role: accountant
+- login: ceo_b
+  display_name: Андрей Лебедев
+  company_id: U_DEMO_B
+  role: ceo
+- login: cfo_b
+  display_name: Мария Орлова
+  company_id: U_DEMO_B
+  role: cfo
+- login: cfo_c
+  display_name: Тимур Валиев
+  company_id: U_DEMO_C
+  role: cfo
+- login: owner_c
+  display_name: Сергей Абрамов
+  company_id: U_DEMO_C
+  role: owner
