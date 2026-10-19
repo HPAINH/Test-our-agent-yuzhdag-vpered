@@ -63,7 +63,9 @@ def test_analyze_strips_prompt_injection(client, cfo_a):
 
 def test_chat_answers_with_sources_and_refuses_offtopic(client, cfo_a):
     ins = client.get("/api/v1/feed", headers=cfo_a).json()["items"][0]["insight_id"]
-    r = client.post("/api/v1/chat", json={"message": "Что говорит банк", "insight_id": ins}, headers=cfo_a).json()
+    r = client.post(
+        "/api/v1/chat", json={"message": "Что говорит банк", "insight_id": ins}, headers=cfo_a
+    ).json()
     assert r["text"]
     r2 = client.post("/api/v1/chat", json={"message": "Какая погода в Сочи?"}, headers=cfo_a).json()
     assert r2["mode"] == "refusal"
@@ -71,6 +73,29 @@ def test_chat_answers_with_sources_and_refuses_offtopic(client, cfo_a):
 
 def test_feedback_and_metrics(client, cfo_a):
     ins = client.get("/api/v1/feed", headers=cfo_a).json()["items"][0]["insight_id"]
-    assert client.post("/api/v1/feedback", json={"insight_id": ins, "vote": -1, "reason": "obvious"}, headers=cfo_a).status_code == 204
+    assert (
+        client.post(
+            "/api/v1/feedback", json={"insight_id": ins, "vote": -1, "reason": "obvious"}, headers=cfo_a
+        ).status_code
+        == 204
+    )
     m = client.get("/api/v1/admin/metrics", headers=cfo_a).json()
     assert m["feedback"]["total"] >= 1 and m["llm"]["budget"]["limit_rub"] == 500
+
+
+def test_chat_free_questions_about_card(client, cfo_a):
+    ins = client.get("/api/v1/feed", headers=cfo_a).json()["items"][0]["insight_id"]
+    for q in (
+        "Как это скажется на марже?",
+        "Почему это важно?",
+        "Насколько это серьёзно для нас?",
+        "Какой прогноз по ставке?",
+    ):
+        r = client.post("/api/v1/chat", json={"message": q, "insight_id": ins}, headers=cfo_a).json()
+        assert r["mode"] not in ("refusal",) and len(r["text"]) > 40, (q, r)
+    r = client.post(
+        "/api/v1/chat", json={"message": "Какая погода в Сочи?", "insight_id": ins}, headers=cfo_a
+    ).json()
+    assert r["mode"] == "refusal"
+    r = client.post("/api/v1/chat", json={"message": "Привет"}, headers=cfo_a).json()
+    assert r["mode"] == "help"
