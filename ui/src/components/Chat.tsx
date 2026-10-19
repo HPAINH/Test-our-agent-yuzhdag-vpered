@@ -34,9 +34,11 @@ export default function Chat({
     try {
       const history = log.slice(-10).map((m) => ({ role: m.role, text: m.text }));
       const r = await api.chat(q, insightId, history);
-      setLog((l) => [...l, { role: "bot", text: r.text, claims: r.claims }]);
+      const text = typeof r?.text === "string" && r.text ? r.text : "Сервер вернул пустой ответ. Попробуйте ещё раз.";
+      const claims = Array.isArray(r?.claims) ? r.claims.filter((c) => c && Array.isArray(c.sources)) : [];
+      setLog((l) => [...l, { role: "bot", text, claims }]);
     } catch (e: any) {
-      setLog((l) => [...l, { role: "bot", text: e.message }]);
+      setLog((l) => [...l, { role: "bot", text: `Не удалось получить ответ: ${e?.message || "ошибка сети"}` }]);
     } finally {
       setBusy(false);
     }
@@ -53,10 +55,10 @@ export default function Chat({
         {log.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
             {m.text}
-            {m.claims && m.claims.some((c) => c.sources?.some((s) => s.type === "material" || s.type === "alfa")) && (
+            {m.claims && m.claims.some((c) => (c.sources || []).some((s) => s.type === "material" || s.type === "alfa")) && (
               <div className="srcs">
                 {m.claims.flatMap((c) =>
-                  c.sources
+                  (c.sources || [])
                     .filter((s) => s.type === "material" || s.type === "alfa")
                     .map((s, j) => <SourceChip key={c.id + j} s={s} sources={sources} onOpen={onOpen} />),
                 )}

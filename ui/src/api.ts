@@ -145,7 +145,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api/v1${path}`, { ...init, headers: { ...headers, ...(init.headers as any) } });
   if (res.status === 204) return undefined as T;
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      if (res.ok) {
+        throw new ApiError(res.status, "bad_response", "Сервер вернул не JSON. Проверьте, что открыт порт 8000 и вы вошли в GitHub.");
+      }
+    }
+  }
   if (!res.ok) {
     const e = data?.error || {};
     if (res.status === 401) setToken(null);
@@ -179,8 +189,9 @@ export const api = {
     }),
   feedback: (insight_id: string, vote: 1 | -1, reason?: string, comment?: string) =>
     request<void>("/feedback", { method: "POST", body: JSON.stringify({ insight_id, vote, reason, comment }) }),
-  uiEvent: (kind: string, ref?: string) =>
-    request<void>("/ui-events", { method: "POST", body: JSON.stringify({ kind, ref }) }).catch(() => undefined),
+  uiEvent: (kind: string, ref?: string) => {
+    request<void>("/ui-events", { method: "POST", body: JSON.stringify({ kind, ref }) }).catch(() => undefined);
+  },
   metrics: () => request<any>("/admin/metrics"),
 };
 

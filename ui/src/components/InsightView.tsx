@@ -4,6 +4,7 @@ import { ClaimItem, KindLegend } from "./Claims";
 import Chat from "./Chat";
 import SourceDrawer from "./SourceDrawer";
 import TracePanel from "./TracePanel";
+import ErrorBoundary from "./ErrorBoundary";
 
 const POL_LABEL = { risk: "Риск", opportunity: "Возможность", mixed: "Требует внимания" } as const;
 const REASONS: [string, string][] = [
@@ -164,11 +165,13 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
                 Как получен вывод
               </button>
             </div>
-            {tab === "chat" ? (
-              <Chat insightId={b.insight_id} sources={data.sources} onOpen={open} />
-            ) : (
-              <TracePanel insightId={b.insight_id} features={s.evidence.features} />
-            )}
+            <ErrorBoundary resetKey={tab}>
+              {tab === "chat" ? (
+                <Chat insightId={b.insight_id} sources={data.sources} onOpen={open} />
+              ) : (
+                <TracePanel insightId={b.insight_id} features={s.evidence.features} />
+              )}
+            </ErrorBoundary>
           </div>
         </div>
       </div>

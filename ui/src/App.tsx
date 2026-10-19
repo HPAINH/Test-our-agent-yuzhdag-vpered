@@ -8,6 +8,7 @@ import InsightPage from "./pages/InsightPage";
 import Analyze from "./pages/Analyze";
 import Profile from "./pages/Profile";
 import Quality from "./pages/Quality";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -162,7 +163,9 @@ function Shell({
             )}
           </div>
         </header>
-        <main className="content">{children}</main>
+        <main className="content">
+          <ErrorBoundary resetKey={route}>{children}</ErrorBoundary>
+        </main>
       </div>
     </div>
   );
