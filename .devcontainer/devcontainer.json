@@ -2,15 +2,28 @@
   "name": "elbrus-news-insights",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-  "forwardPorts": [8000],
-  "portsAttributes": { "8000": { "label": "Пульс бизнеса", "onAutoForward": "openPreview" } },
-  "postCreateCommand": "pip install uv && uv sync && cd ui && npm ci && npm run build",
-  "postStartCommand": "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000",
+  "forwardPorts": [
+    8000
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "Пульс бизнеса",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "pip install --user uv && ~/.local/bin/uv sync && cd ui && npm ci && npm run build",
+  "postStartCommand": "nohup ~/.local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/app.log 2>&1 &",
   "secrets": {
-    "LLM_API_KEY": { "description": "Общий ключ организаторов к моделям (необязательно: без него работает mock-режим)" },
-    "LLM_BASE_URL": { "description": "OpenAI-совместимый адрес API организаторов" }
+    "LLM_API_KEY": {
+      "description": "Общий ключ организаторов к моделям (необязательно: без него работает mock-режим)"
+    },
+    "LLM_BASE_URL": {
+      "description": "OpenAI-совместимый адрес API организаторов"
+    }
   }
 }
