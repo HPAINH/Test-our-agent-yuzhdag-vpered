@@ -270,3 +270,6 @@ table.plain td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); }
   .digest p { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
   .ins-head h1, h1 { font-size: 22px; }
 }
+
+html:has(.embed), body:has(.embed) { background: transparent; }
+.embed { padding: 1px; }

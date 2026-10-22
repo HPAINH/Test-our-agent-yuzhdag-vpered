@@ -111,8 +111,10 @@ export interface User {
 }
 
 const TOKEN_KEY = "pulse_token";
+let memoryToken: string | null = null;
 
 export function getToken(): string | null {
+  if (memoryToken) return memoryToken;
   try {
     return localStorage.getItem(TOKEN_KEY);
   } catch {
@@ -120,7 +122,9 @@ export function getToken(): string | null {
   }
 }
 
-export function setToken(token: string | null) {
+export function setToken(token: string | null, persist = true) {
+  memoryToken = token;
+  if (!persist) return;
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
@@ -168,6 +172,11 @@ export const api = {
   users: () => request<User[]>("/auth/users"),
   login: (login: string) =>
     request<{ token: string; user: User }>("/auth/login", { method: "POST", body: JSON.stringify({ login }) }),
+  launch: (launch_token: string) =>
+    request<{ token: string; user: User; target: string }>("/auth/launch", {
+      method: "POST",
+      body: JSON.stringify({ launch_token }),
+    }),
   me: () => request<User>("/me"),
   meta: () => request<{ factors: Record<string, string>; roles: Record<string, string>; llm_mode: string }>("/meta"),
   widget: () => request<{ top: FeedCard[]; total: number; new_count: number; risk_count: number; as_of: string }>("/home/widget"),

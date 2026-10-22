@@ -60,6 +60,17 @@ async def validation_error(request: Request, exc: RequestValidationError):
 
 app.include_router(router)
 
+
+@app.middleware("http")
+async def frame_policy(request: Request, call_next):
+    response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("text/html"):
+        ancestors = get_settings().embed_allowed_origins.strip() or "'self'"
+        response.headers["Content-Security-Policy"] = f"frame-ancestors {ancestors}"
+        response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
 if UI_DIST.exists():
     app.mount("/assets", StaticFiles(directory=UI_DIST / "assets"), name="assets")
 

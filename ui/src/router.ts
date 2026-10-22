@@ -7,11 +7,19 @@ export type Route =
   | { name: "event"; id: string }
   | { name: "analyze" }
   | { name: "profile" }
-  | { name: "quality" };
+  | { name: "quality" }
+  | { name: "launch"; token: string }
+  | { name: "embed"; token: string };
 
 export function parse(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/");
+  const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
+  const parts = path.split("/");
+  const token = new URLSearchParams(query).get("t") || "";
   switch (parts[0]) {
+    case "launch":
+      return { name: "launch", token };
+    case "embed":
+      return { name: "embed", token };
     case "feed":
       return { name: "feed" };
     case "insight":
@@ -31,6 +39,11 @@ export function parse(hash: string): Route {
 
 export function go(path: string) {
   window.location.hash = path;
+}
+
+export function replace(path: string) {
+  window.history.replaceState(null, "", `${window.location.pathname}#${path}`);
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
 export function useRoute(): Route {

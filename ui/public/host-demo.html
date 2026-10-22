@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Главный экран интернет-банка — демо-хост</title>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #1b1f2a; --ink-3: #7a8294; --line: #e3e6ec; --bg: #f3f4f7; --surface: #fff; --bank: #d6332a;
+    font-family: "Golos Text", system-ui, sans-serif; font-size: 15px; line-height: 1.5; color: var(--ink); background: var(--bg);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  .brand b { font-size: 18px; } .brand span { color: var(--ink-3); margin-left: 6px; font-size: 13px; }
+  .spacer { flex: 1; }
+  .entry { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--bank); color: var(--bank); background: #fff; border-radius: 999px; padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  .entry:hover { background: #fdecea; }
+  .entry .badge { background: var(--bank); color: #fff; border-radius: 999px; min-width: 22px; padding: 0 6px; font-size: 12px; line-height: 20px; text-align: center; }
+  select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .layout { display: grid; grid-template-columns: 220px 1fr 380px; gap: 24px; padding: 24px; max-width: 1360px; margin: 0 auto; }
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  nav span { padding: 8px 12px; border-radius: 6px; color: var(--ink-3); }
+  nav span.on { background: var(--surface); color: var(--ink); font-weight: 600; }
+  nav button { text-align: left; padding: 8px 12px; border: 0; background: none; font: inherit; color: var(--ink); cursor: pointer; border-radius: 6px; display: flex; justify-content: space-between; }
+  nav button:hover { background: var(--surface); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .num { font-size: 22px; font-weight: 600; }
+  .muted { color: var(--ink-3); font-size: 13px; }
+  .note { font-size: 12px; color: var(--ink-3); border-left: 3px solid var(--line); padding-left: 10px; }
+  iframe { width: 100%; border: 0; display: block; min-height: 120px; }
+  .err { color: #b42318; font-size: 13px; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } nav { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>Бизнес</b><span>интернет-банк · имитация главного экрана</span></div>
+  <div class="spacer"></div>
+  <label class="muted">Пользователь <select id="user"></select></label>
+  <button class="entry" id="entry" title="Открыть «Пульс бизнеса»">Пульс бизнеса <span class="badge" id="badge" hidden></span></button>
+</header>
+<div class="layout">
+  <nav aria-label="Разделы">
+    <span class="on">Главная</span>
+    <span>Счета и выписки</span>
+    <span>Платежи</span>
+    <span>Кредиты и гарантии</span>
+    <button id="nav-pulse">Пульс бизнеса <span class="badge-nav" id="badge-nav"></span></button>
+  </nav>
+  <main>
+    <div class="card">
+      <div class="muted">Расчётный счёт</div>
+      <div class="num">1 284 503 120 ₽</div>
+    </div>
+    <div class="card">
+      <div class="muted">Платежи на подписи</div>
+      <div class="num">7</div>
+    </div>
+    <p class="note">
+      Страница изображает главный экран интернет-банка, в который встраивается сервис. Остатки — заглушки.
+      Точки входа: кнопка «Пульс бизнеса» в шапке (видна на всех экранах банка), пункт меню и виджет справа.
+      Ссылки входа подписывает демо-подписант; в банке их выпускает бэкенд интернет-банка (см. docs/integration.md).
+    </p>
+    <p class="err" id="err" hidden></p>
+  </main>
+  <aside><iframe id="widget" title="Пульс бизнеса" src="about:blank"></iframe></aside>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const api = async (path, body) => {
+    const r = await fetch("/api/v1" + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((data.error && data.error.message) || "Ошибка " + r.status);
+    return data;
+  };
+  const showErr = (e) => { $("err").textContent = e.message; $("err").hidden = false; };
+  const login = () => $("user").value;
+
+  async function loadWidget() {
+    $("badge").hidden = true;
+    $("badge-nav").textContent = "";
+    try {
+      const link = await api("/host-demo/launch-link", { login: login() });
+      $("widget").src = link.embed_url;
+    } catch (e) { showErr(e); }
+  }
+
+  async function openService(target) {
+    try {
+      const link = await api("/host-demo/launch-link", { login: login(), target });
+      window.location.href = link.url;
+    } catch (e) { showErr(e); }
+  }
+
+  window.addEventListener("message", (ev) => {
+    if (ev.origin !== window.location.origin || ev.source !== $("widget").contentWindow) return;
+    const m = ev.data || {};
+    if (m.source !== "pulse") return;
+    if (m.type === "pulse:resize" && m.height) $("widget").style.height = m.height + "px";
+    if (m.type === "pulse:badge") {
+      $("badge").textContent = m.count; $("badge").hidden = !m.count;
+      $("badge-nav").textContent = m.count || "";
+    }
+    if (m.type === "pulse:open" && typeof m.target === "string") openService(m.target);
+  });
+
+  $("entry").onclick = () => openService("feed");
+  $("nav-pulse").onclick = () => openService("feed");
+  $("user").onchange = loadWidget;
+
+  api("/auth/users").then((users) => {
+    for (const u of users) {
+      const o = document.createElement("option");
+      o.value = u.login; o.textContent = u.display_name + " — " + u.role_name;
+      $("user").appendChild(o);
+    }
+    loadWidget();
+  }).catch(showErr);
+</script>
+</body>
+</html>

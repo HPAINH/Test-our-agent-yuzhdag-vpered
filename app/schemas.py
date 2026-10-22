@@ -177,3 +177,12 @@ class FeedbackIn(BaseModel):
 class UIEventIn(BaseModel):
     kind: Literal["open_source", "open_insight", "open_trace", "filter", "chat_quick"]
     ref: str | None = None
+
+
+class LaunchIn(BaseModel):
+    launch_token: str = Field(min_length=1, max_length=2048)
+
+
+class LaunchLinkIn(BaseModel):
+    login: str = Field(min_length=1, max_length=64)
+    target: str | None = Field(default=None, max_length=128)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getToken, setToken, User } from "./api";
-import { go, useRoute } from "./router";
+import { go, replace, useRoute } from "./router";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Feed from "./pages/Feed";
@@ -8,14 +8,19 @@ import InsightPage from "./pages/InsightPage";
 import Analyze from "./pages/Analyze";
 import Profile from "./pages/Profile";
 import Quality from "./pages/Quality";
+import Embed from "./pages/Embed";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const route = useRoute();
 
+  const launchToken = route.name === "launch" ? route.token : null;
+
   useEffect(() => {
+    if (route.name === "embed" || launchToken !== null) return;
     if (!getToken()) {
       setReady(true);
       return;
@@ -27,11 +32,34 @@ export default function App() {
       .finally(() => setReady(true));
   }, []);
 
+  useEffect(() => {
+    if (launchToken === null) return;
+    setReady(false);
+    api
+      .launch(launchToken)
+      .then((r) => {
+        setToken(r.token);
+        setUser(r.user);
+        setNotice(null);
+        replace(`/${r.target}`);
+      })
+      .catch((e) => {
+        setToken(null);
+        setUser(null);
+        setNotice(e.message);
+        replace("/home");
+      })
+      .finally(() => setReady(true));
+  }, [launchToken]);
+
+  if (route.name === "embed") return <Embed token={route.token} />;
   if (!ready) return <div className="spinner">Загрузка…</div>;
   if (!user)
     return (
       <Login
+        notice={notice}
         onLogin={(u) => {
+          setNotice(null);
           setUser(u);
           go("/home");
         }}

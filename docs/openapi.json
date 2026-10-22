@@ -74,6 +74,78 @@
         }
       }
     },
+    "/api/v1/auth/launch": {
+      "post": {
+        "summary": "Launch",
+        "operationId": "launch_api_v1_auth_launch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/host-demo/launch-link": {
+      "post": {
+        "summary": "Host Demo Launch Link",
+        "operationId": "host_demo_launch_link_api_v1_host_demo_launch_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "summary": "Me",
@@ -1207,6 +1279,48 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "LaunchIn": {
+        "properties": {
+          "launch_token": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Launch Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "launch_token"
+        ],
+        "title": "LaunchIn"
+      },
+      "LaunchLinkIn": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Login"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login"
+        ],
+        "title": "LaunchLinkIn"
       },
       "LoginIn": {
         "properties": {

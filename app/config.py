@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     agent_top_n: int = 5
     feed_threshold: float = 0.35
     cors_origins: str = "*"
+    host_launch_secret: str = "dev-host-secret-change-me"
+    host_demo: bool = True
+    embed_allowed_origins: str = "'self'"
 
     @property
     def data_path(self) -> Path:

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.agent.chat import answer
 from app.agent.orchestrator import run_agent
 from app.api.auth import admin_user, audit, current_user, issue_token, limiter
+from app.api.launch import LaunchError, sign_launch, verify_launch
 from app.config import get_settings, load_factor_rules, load_yaml
 from app.db.models import (
     AppUser,
@@ -31,7 +32,7 @@ from app.ingest.news import UnsafeURL, add_material, fetch_url
 from app.llm.client import get_llm
 from app.processing.pipeline import process_material
 from app.ranking.score import reference_time, score_event
-from app.schemas import AnalyzeIn, ChatIn, FeedbackIn, LoginIn, UIEventIn
+from app.schemas import AnalyzeIn, ChatIn, FeedbackIn, LaunchIn, LaunchLinkIn, LoginIn, UIEventIn
 
 router = APIRouter(prefix="/api/v1")
 PAGE_SIZE = 20
@@ -156,6 +157,29 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
         err(401, "unknown_user", "Учётная запись не найдена")
     audit(db, user.login, "login", "ok")
     return {"token": issue_token(user.login), "user": user_dict(user, db)}
+
+
+@router.post("/auth/launch")
+def launch(body: LaunchIn, db: Session = Depends(get_db)):
+    try:
+        user, target = verify_launch(db, body.launch_token)
+    except LaunchError as e:
+        audit(db, None, "launch", "denied", e.code)
+        db.commit()
+        err(401, e.code, e.message)
+    audit(db, user.login, "launch", "ok", target)
+    return {"token": issue_token(user.login), "user": user_dict(user, db), "target": target}
+
+
+@router.post("/host-demo/launch-link")
+def host_demo_launch_link(body: LaunchLinkIn, db: Session = Depends(get_db)):
+    if not get_settings().host_demo:
+        err(404, "not_found", "Демо-хост выключен")
+    user = db.get(AppUser, body.login)
+    if user is None:
+        err(404, "unknown_user", "Учётная запись не найдена")
+    token = sign_launch(user.login, user.company_id, body.target)
+    return {"launch_token": token, "url": f"/#/launch?t={token}", "embed_url": f"/#/embed?t={token}"}
 
 
 @router.get("/me")

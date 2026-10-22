@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, setToken, User } from "../api";
 import { companyName } from "../App";
 
-export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
+export default function Login({ onLogin, notice }: { onLogin: (u: User) => void; notice?: string | null }) {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -43,6 +43,7 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
       <div className="login-panel">
         <h2>Вход в демо-кабинет</h2>
         <p className="muted">Выберите тестового пользователя. Компании и данные синтетические.</p>
+        {notice && <div className="error">{notice}</div>}
         {error && <div className="error">{error}</div>}
         <div className="login-list">
           {users.map((u) => (

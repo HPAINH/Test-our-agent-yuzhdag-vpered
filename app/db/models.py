@@ -172,3 +172,9 @@ class AuditLog(Base):
     args_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     result: Mapped[str] = mapped_column(String(32))
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class LaunchNonce(Base):
+    __tablename__ = "launch_nonce"
+    nonce: Mapped[str] = mapped_column(String(64), primary_key=True)
+    exp: Mapped[datetime] = mapped_column(DateTime, index=True)

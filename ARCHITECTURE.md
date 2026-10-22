@@ -12,6 +12,11 @@ UI → REST/SSE API (`app/api`) → агент (`app/agent`) → инструм�
 фоновая обработка (`app/worker.py`) → сбор, классификация, ранжирование, прогрев инсайтов.
 Все обращения к моделям — через `app/llm/client.py` (роутинг, кэш, бюджет, фолбэк).
 
+## Встраивание в интернет-банк
+
+Банк открывает сервис по подписанной одноразовой ссылке (`POST /api/v1/auth/launch`, `app/api/launch.py`)
+и показывает виджет на главном экране в iframe (`#/embed`). Контракт и демо-хост — [docs/integration.md](docs/integration.md).
+
 ## Хранение данных
 
 PostgreSQL в Docker, SQLite локально; схема в `app/db/models.py`, создаётся `create_all`.
