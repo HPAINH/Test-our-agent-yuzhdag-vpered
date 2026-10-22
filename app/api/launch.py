@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import AppUser, LaunchNonce
+from app.profile.store import accessible_companies
 
 MAX_TTL_S = 300
 TARGET_RE = re.compile(r"^(home|feed|analyze|profile|insight/[A-Za-z0-9_-]{1,64}|event/[A-Za-z0-9_-]{1,64})$")
@@ -50,7 +51,7 @@ def sign_launch(login: str, company: str, target: str | None = None, ttl_s: int 
     return f"{payload}.{_sig(payload)}"
 
 
-def verify_launch(db: Session, token: str) -> tuple[AppUser, str]:
+def verify_launch(db: Session, token: str) -> tuple[AppUser, str, str]:
     try:
         payload, sig = token.split(".", 1)
     except ValueError:
@@ -77,7 +78,7 @@ def verify_launch(db: Session, token: str) -> tuple[AppUser, str]:
     user = db.get(AppUser, str(claims.get("sub", "")))
     if user is None:
         raise LaunchError("launch_unknown_user", "Пользователь не подключён к сервису")
-    if claims.get("company") != user.company_id:
+    if claims.get("company") not in accessible_companies(db, user):
         raise LaunchError(
             "launch_company_mismatch", "Компания в ссылке не совпадает с компанией пользователя"
         )
@@ -87,4 +88,4 @@ def verify_launch(db: Session, token: str) -> tuple[AppUser, str]:
         raise LaunchError("launch_replayed", "Ссылка входа уже использована")
     db.add(LaunchNonce(nonce=nonce, exp=datetime.utcfromtimestamp(exp) + timedelta(seconds=5)))
     db.flush()
-    return user, safe_target(claims.get("target"))
+    return user, safe_target(claims.get("target")), claims["company"]

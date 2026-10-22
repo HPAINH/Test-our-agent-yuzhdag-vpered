@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import load_factor_rules, load_yaml
-from app.db.models import AppUser, Company, Event, Relevance
+from app.db.models import Company, Event, Relevance
 from app.processing.pipeline import cosine
 from app.processing.text import stems
 
@@ -75,6 +75,11 @@ def score_event(
     if any(okved.startswith(s) or prefix == s for s in sections):
         I, i_why = 1.0, f"отрасль компании ({okved})"
     else:
+        for m in (profile.get("group") or {}).get("member_industries", []):
+            if m.get("okved") and any(m["okved"].startswith(s) for s in sections):
+                I, i_why = 0.7, f"отрасль компании группы {m['company_id']} ({m['okved']})"
+                break
+    if not I:
         for cp in profile.get("counterparties", []):
             if cp.get("okved") and any(cp["okved"].startswith(s) for s in sections) and cp["share"] >= 0.1:
                 I, i_why = (
@@ -141,9 +146,9 @@ def rank_company(
 
 
 def rank_all(session: Session) -> int:
-    pairs: dict[str, set] = {}
-    for u in session.scalars(select(AppUser)):
-        pairs.setdefault(u.company_id, set()).add(u.role)
+    from app.profile.store import company_role_pairs
+
+    pairs = company_role_pairs(session)
     n = 0
     for cid, roles in pairs.items():
         company = session.get(Company, cid)

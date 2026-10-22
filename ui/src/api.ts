@@ -1,4 +1,11 @@
-export type ClaimKind = "fact" | "bank" | "ai";
+export type ClaimKind = "fact" | "bank" | "ai" | "hypothesis";
+
+export interface Impact {
+  level: "low" | "medium" | "high";
+  score: number;
+  basis: string[];
+  estimate?: string | null;
+}
 
 export interface SourceRef {
   type: "material" | "alfa" | "feature" | "claim" | "event";
@@ -34,6 +41,7 @@ export interface InsightBody {
   factors: string[];
   polarity: "risk" | "opportunity" | "mixed";
   horizon: string;
+  impact?: Impact | null;
   confidence: number;
   verification: { passed: boolean; iterations: number; issues: any[]; checks: any[] };
   status: "ok" | "insufficient_data" | "not_relevant" | "failed";
@@ -62,6 +70,8 @@ export interface InsightPayload {
   score: number;
   event: { id: string; title: string; classification: any; published_at?: string; private: boolean };
   factor_names: Record<string, string>;
+  disclaimer: string;
+  impact_scale: Record<string, { label: string; meaning: string }>;
   sources: Record<string, SourceMeta>;
 }
 
@@ -85,6 +95,8 @@ export interface FeedCard {
   type: string;
   regions: string[];
   stale: boolean;
+  impact?: Impact | null;
+  hidden: boolean;
 }
 
 export interface Company {
@@ -108,6 +120,7 @@ export interface User {
   role_focus: string;
   is_admin: boolean;
   company: Company;
+  companies: Company[];
 }
 
 const TOKEN_KEY = "pulse_token";
@@ -202,6 +215,18 @@ export const api = {
     request<void>("/ui-events", { method: "POST", body: JSON.stringify({ kind, ref }) }).catch(() => undefined);
   },
   metrics: () => request<any>("/admin/metrics"),
+  refreshNews: () => request<{ started: boolean; rss_enabled: boolean }>("/admin/news/refresh", { method: "POST" }),
+  switchCompany: (company_id: string) =>
+    request<{ token: string; user: User }>("/auth/company", { method: "POST", body: JSON.stringify({ company_id }) }),
+  hideEvent: (eventId: string) => request<void>(`/events/${eventId}/hide`, { method: "POST" }),
+  unhideEvent: (eventId: string) => request<void>(`/events/${eventId}/hide`, { method: "DELETE" }),
+  createRequest: (body: { kind: "manager" | "callback" | "application"; insight_id?: string; product?: string | null; comment?: string }) =>
+    request<{ id: number; message: string }>("/requests", { method: "POST", body: JSON.stringify(body) }),
+  factorHint: (factor: string, mode: "boost" | "mute" | "reset") =>
+    request<{ user_hints: Record<string, string> }>(`/companies/me/factors/${factor}`, {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
+    }),
 };
 
 export async function analyzeStream(

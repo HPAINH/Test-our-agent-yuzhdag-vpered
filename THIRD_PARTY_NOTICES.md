@@ -1,39 +1,45 @@
 # Сторонние компоненты
 
-## Python-библиотеки (версии зафиксированы в `uv.lock`)
+## Python-библиотеки
 
-| Компонент | Назначение | Лицензия |
+Python 3.12. Точные версии с зависимостями — в `uv.lock`; ниже версии прямых зависимостей на момент сдачи.
+
+| Компонент | Версия | Назначение | Лицензия |
+| --- | --- | --- | --- |
+| FastAPI, Starlette | 0.149.0, 1.9.0 | HTTP API | MIT, BSD-3-Clause |
+| Uvicorn | 0.54.0 | ASGI-сервер | BSD-3-Clause |
+| SQLAlchemy | 2.1.5 | ORM | MIT |
+| psycopg 3 | 3.3.6 | драйвер PostgreSQL | LGPL-3.0 |
+| Pydantic, pydantic-settings | 2.14.1, 2.16.0 | схемы и конфигурация | MIT |
+| PyYAML | 6.0.3 | конфигурация | MIT |
+| HTTPX | 0.28.1 | вызовы LLM API и загрузка страниц | BSD-3-Clause |
+| feedparser | 6.0.14 | разбор RSS | BSD-2-Clause |
+| PyMuPDF | 1.28.2 | извлечение текста из PDF | **AGPL-3.0** (для продакшна заменить на pypdf или купить коммерческую лицензию) |
+| snowballstemmer | 3.1.1 | стемминг русского текста | BSD-3-Clause |
+| pandas | 3.0.6 | загрузка CSV | BSD-3-Clause |
+| APScheduler | 3.11.3 | расписание фоновых задач | MIT |
+| Beautiful Soup 4 | 4.15.0 | очистка HTML | MIT |
+| pytest, Ruff (dev) | 9.1.1, 0.17.1 | тесты и линтер | MIT |
+| sentence-transformers (опционально) | не установлен по умолчанию | эмбеддинги | Apache-2.0 |
+
+## Frontend
+
+Node.js 20. Точные версии — в `ui/package-lock.json`.
+
+| Компонент | Версия | Лицензия |
 | --- | --- | --- |
-| FastAPI, Starlette | HTTP API | MIT, BSD-3-Clause |
-| Uvicorn | ASGI-сервер | BSD-3-Clause |
-| SQLAlchemy | ORM | MIT |
-| psycopg 3 | драйвер PostgreSQL | LGPL-3.0 |
-| Pydantic, pydantic-settings | схемы и конфигурация | MIT |
-| PyYAML | конфигурация | MIT |
-| HTTPX | вызовы LLM API и загрузка страниц | BSD-3-Clause |
-| feedparser | разбор RSS | BSD-2-Clause |
-| PyMuPDF | извлечение текста из PDF | **AGPL-3.0** (для продакшна заменить на pypdf или купить коммерческую лицензию) |
-| snowballstemmer | стемминг русского текста | BSD-3-Clause |
-| pandas | загрузка CSV | BSD-3-Clause |
-| APScheduler | расписание фоновых задач | MIT |
-| Beautiful Soup 4 | очистка HTML | MIT |
-| pytest, Ruff (dev) | тесты и линтер | MIT |
-| sentence-transformers (опционально) | эмбеддинги | Apache-2.0 |
-
-## Frontend (версии зафиксированы в `ui/package-lock.json`)
-
-| Компонент | Лицензия |
-| --- | --- |
-| React, React DOM | MIT |
-| Vite, @vitejs/plugin-react | MIT |
-| TypeScript | Apache-2.0 |
-| Шрифт Golos Text (Google Fonts) | SIL Open Font License 1.1 |
+| React, React DOM | 18.3.1 | MIT |
+| Vite, @vitejs/plugin-react | 5.4.21, 4.7.0 | MIT |
+| TypeScript | 5.6.3 | Apache-2.0 |
+| Шрифт Golos Text (Google Fonts) | — | SIL Open Font License 1.1 |
 
 ## Модели
 
 Используются только модели из приложения 3 кейса через общий ключ организаторов: Gemma 4 26B A4B, GLM-5.3-Flash,
 Qwen3.6 35B A3B, DeepSeek-V4.1-Flash, Qwen3-VL-30B-A3B-Instruct, Kimi-K2.6. Условия использования — по
-документам организаторов. Опционально (после подтверждения организаторов): BAAI/bge-m3 (MIT) для эмбеддингов.
+документам организаторов. Ограничение относится к генеративным моделям; для эмбеддингов, реранкеров и классического ML
+разрешены локальные open-source модели (ответ организаторов на вебинаре). Сейчас поиск работает на собственном BM25;
+опционально подключается BAAI/bge-m3 (MIT) через `sentence-transformers`.
 
 ## Данные и сервисы
 
@@ -48,6 +54,7 @@ Qwen3.6 35B A3B, DeepSeek-V4.1-Flash, Qwen3-VL-30B-A3B-Instruct, Kimi-K2.6. Ус
 
 - Вход в интернет-банк — тестовые учётки без пароля, подписанный токен сессии.
 - Главный экран интернет-банка в `/host-demo.html` и подписант ссылок входа — имитация стороны банка.
+- Заявки «Обсудить с менеджером», «Обратный звонок», «Оставить заявку» сохраняются в таблице `service_request`; CRM банка не вызывается.
 - Разделы «Счета», «Платежи», «Кредиты», остатки на главной — заглушки интерфейса.
 - Продукты банка в блоке «Предложение банка» — справочник категорий (`config/interpretation.yaml`), заявка не отправляется.
 - Названия демо-компаний вымышлены.

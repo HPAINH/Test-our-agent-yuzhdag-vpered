@@ -2,7 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-ClaimKind = Literal["fact", "bank", "ai"]
+ClaimKind = Literal["fact", "bank", "ai", "hypothesis"]
+ImpactLevel = Literal["low", "medium", "high"]
 SourceType = Literal["material", "alfa", "feature", "claim", "event"]
 InsightStatus = Literal["ok", "insufficient_data", "not_relevant", "failed"]
 Direction = Literal["up", "down", "flat"]
@@ -32,8 +33,8 @@ class Claim(BaseModel):
             raise ValueError(f"claim {self.id}: fact requires a material source")
         if self.kind == "bank" and "alfa" not in types:
             raise ValueError(f"claim {self.id}: bank requires an alfa source")
-        if self.kind == "ai" and not types & {"feature", "claim", "material", "alfa"}:
-            raise ValueError(f"claim {self.id}: ai requires feature or claim source")
+        if self.kind in ("ai", "hypothesis") and not types & {"feature", "claim", "material", "alfa"}:
+            raise ValueError(f"claim {self.id}: {self.kind} requires feature or claim source")
         return self
 
 
@@ -65,6 +66,13 @@ class Verification(BaseModel):
     checks: list[dict] = []
 
 
+class Impact(BaseModel):
+    level: ImpactLevel
+    score: int = Field(ge=0, le=100)
+    basis: list[str] = []
+    estimate: str | None = None
+
+
 class InsightBody(BaseModel):
     insight_id: str
     event_id: str
@@ -77,6 +85,7 @@ class InsightBody(BaseModel):
     factors: list[str] = []
     polarity: Polarity = "mixed"
     horizon: str = "1-3m"
+    impact: Impact | None = None
     confidence: float = Field(ge=0, le=1)
     verification: Verification
     status: InsightStatus
@@ -185,4 +194,20 @@ class LaunchIn(BaseModel):
 
 class LaunchLinkIn(BaseModel):
     login: str = Field(min_length=1, max_length=64)
+    company_id: str | None = Field(default=None, max_length=64)
     target: str | None = Field(default=None, max_length=128)
+
+
+class CompanySwitchIn(BaseModel):
+    company_id: str = Field(min_length=1, max_length=64)
+
+
+class ServiceRequestIn(BaseModel):
+    kind: Literal["manager", "callback", "application"]
+    insight_id: str | None = Field(default=None, max_length=64)
+    product: str | None = Field(default=None, max_length=64)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class FactorHintIn(BaseModel):
+    mode: Literal["boost", "mute", "reset"]

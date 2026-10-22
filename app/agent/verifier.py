@@ -53,6 +53,9 @@ def programmatic_checks(body: InsightBody, ctx: RunContext) -> list[dict]:
                 extra = _numbers(c.text) - _numbers(m.text)
                 if extra:
                     bad_bank.append({"claim": c.id, "why": f"числа {sorted(extra)} нет в отчёте банка"})
+    for c in body.sections.bank_view:
+        if c.kind != "bank":
+            bad_bank.append({"claim": c.id, "why": "в разделе банка утверждение не из аналитики банка"})
     checks.append(
         {"n": 2, "name": "Позиция банка подтверждается отчётом", "pass": not bad_bank, "issues": bad_bank}
     )

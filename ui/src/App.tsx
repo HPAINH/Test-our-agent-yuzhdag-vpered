@@ -72,6 +72,12 @@ export default function App() {
     setUser(r.user);
     go("/feed");
   };
+  const switchCompany = async (companyId: string) => {
+    const r = await api.switchCompany(companyId);
+    setToken(r.token);
+    setUser(r.user);
+    go("/home");
+  };
 
   let page;
   switch (route.name) {
@@ -98,19 +104,26 @@ export default function App() {
   }
 
   return (
-    <Shell user={user} route={route.name} onSwitch={switchUser} onLogout={() => { setToken(null); setUser(null); }}>
+    <Shell
+      user={user}
+      route={route.name}
+      onSwitch={switchUser}
+      onCompany={switchCompany}
+      onLogout={() => { setToken(null); setUser(null); }}
+    >
       {page}
     </Shell>
   );
 }
 
 function Shell({
-  user, route, children, onSwitch, onLogout,
+  user, route, children, onSwitch, onCompany, onLogout,
 }: {
   user: User;
   route: string;
   children: React.ReactNode;
   onSwitch: (login: string) => void;
+  onCompany: (companyId: string) => void;
   onLogout: () => void;
 }) {
   const [menu, setMenu] = useState(false);
@@ -119,7 +132,7 @@ function Shell({
 
   useEffect(() => {
     api.widget().then((w) => setBadge(w.new_count)).catch(() => setBadge(null));
-  }, [user.login]);
+  }, [user.login, user.company.id]);
 
   const openMenu = () => {
     setMenu((m) => !m);
@@ -162,7 +175,20 @@ function Shell({
       <div className="main">
         <header className="topbar">
           <div className="company-chip">
-            <b>{companyName(user)}</b>
+            {user.companies?.length > 1 ? (
+              <select
+                className="company-select"
+                value={user.company.id}
+                onChange={(e) => onCompany(e.target.value)}
+                aria-label="Компания"
+              >
+                {user.companies.map((c) => (
+                  <option key={c.id} value={c.id}>{nameOf(c.id)}</option>
+                ))}
+              </select>
+            ) : (
+              <b>{companyName(user)}</b>
+            )}
             <span className="small muted">
               {user.company.industry} · {user.company.region}
             </span>
@@ -191,7 +217,7 @@ function Shell({
             )}
           </div>
         </header>
-        <main className="content">
+        <main className="content" key={user.company.id}>
           <ErrorBoundary resetKey={route}>{children}</ErrorBoundary>
         </main>
       </div>
@@ -199,11 +225,18 @@ function Shell({
   );
 }
 
+const COMPANY_NAMES: Record<string, string> = {
+  U_DEMO_A: "Металлургический комбинат «А» (демо)",
+  U_G17_COAL: "Угольная компания группы «А» (демо)",
+  U_G17_TRADE: "Торговый дом группы «А» (демо)",
+  U_DEMO_B: "Продуктовая сеть «Б» (демо)",
+  U_DEMO_C: "Девелопер «В» (демо)",
+};
+
+export function nameOf(id: string) {
+  return COMPANY_NAMES[id] || `Компания ${id}`;
+}
+
 export function companyName(u: User) {
-  const names: Record<string, string> = {
-    U_DEMO_A: "Металлургический комбинат «А» (демо)",
-    U_DEMO_B: "Продуктовая сеть «Б» (демо)",
-    U_DEMO_C: "Девелопер «В» (демо)",
-  };
-  return names[u.company.id] || `Компания ${u.company.id}`;
+  return nameOf(u.company.id);
 }

@@ -23,7 +23,9 @@ def warm_insights(limit: int | None = None) -> int:
     limit = limit or settings.agent_top_n
     n = 0
     with session_scope() as s:
-        pairs = {(u.company_id, u.role) for u in s.scalars(select(AppUser))}
+        from app.profile.store import company_role_pairs
+
+        pairs = {(cid, role) for cid, roles in company_role_pairs(s).items() for role in roles}
     for company_id, role in sorted(pairs):
         with session_scope() as s:
             company = s.get(Company, company_id)

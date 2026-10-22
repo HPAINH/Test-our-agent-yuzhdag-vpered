@@ -381,7 +381,7 @@ def corpus_answer(
         return None
     facts = [c["text"] for c in claims if c["kind"] == "fact"]
     banks = [c["text"] for c in claims if c["kind"] == "bank"]
-    ais = [c["text"] for c in claims if c["kind"] == "ai"]
+    ais = [c["text"] for c in claims if c["kind"] in ("ai", "hypothesis")]
     parts = []
     if facts:
         parts.append("По новостям: " + _sentence_join(facts, 2))

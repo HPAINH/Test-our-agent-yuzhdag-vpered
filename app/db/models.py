@@ -178,3 +178,30 @@ class LaunchNonce(Base):
     __tablename__ = "launch_nonce"
     nonce: Mapped[str] = mapped_column(String(64), primary_key=True)
     exp: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class UserCompany(Base):
+    __tablename__ = "user_company"
+    login: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class HiddenEvent(Base):
+    __tablename__ = "hidden_event"
+    login: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ServiceRequest(Base):
+    __tablename__ = "service_request"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    login: Mapped[str] = mapped_column(String(64), index=True)
+    company_id: Mapped[str] = mapped_column(String(64), index=True)
+    insight_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    product: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="new")

@@ -89,6 +89,37 @@ def _classify(df: pd.DataFrame) -> str | None:
     return None
 
 
+def dedupe_companies(companies: pd.DataFrame, report: LoadReport) -> pd.DataFrame:
+    counts = companies[COMPANY_KEY].value_counts()
+    dup_ids = counts[counts > 1].index
+    if not len(dup_ids):
+        return companies
+    keep, exact, artifacts, conflicts = [], [], [], []
+    for cid in dup_ids:
+        rows = companies[companies[COMPANY_KEY] == cid]
+        values = rows.drop(columns=[COMPANY_KEY]).astype(str).apply(lambda c: c.str.strip())
+        filled = (values != "").mean(axis=1)
+        if len(values.drop_duplicates()) == 1:
+            exact.append(cid)
+            keep.append(rows.index[0])
+        elif filled.max() < 0.5:
+            artifacts.append(cid)
+        else:
+            conflicts.append(cid)
+            keep.append(filled.idxmax())
+    unique = companies[~companies[COMPANY_KEY].isin(dup_ids)]
+    report.invalid["duplicate_ids"] = {
+        "exact": exact,
+        "anonymization_artifacts": artifacts,
+        "conflicting_kept_most_complete": conflicts,
+    }
+    if artifacts:
+        report.warnings.append(
+            f"технические идентификаторы с пустыми строками исключены: {', '.join(map(str, artifacts))}"
+        )
+    return pd.concat([unique, companies.loc[keep]]).sort_index()
+
+
 def load_raw(data_dir: Path) -> RawData:
     report = LoadReport()
     found: dict[str, pd.DataFrame] = {}
@@ -122,7 +153,7 @@ def load_raw(data_dir: Path) -> RawData:
     ]
     before = len(companies)
     companies = companies[companies.get(COMPANY_KEY, pd.Series(dtype=str)).astype(str).str.strip() != ""]
-    companies = companies.drop_duplicates(subset=[COMPANY_KEY], keep="first")
+    companies = dedupe_companies(companies, report)
     if len(companies) != before:
         report.invalid["companies_dropped"] = before - len(companies)
 
@@ -131,6 +162,19 @@ def load_raw(data_dir: Path) -> RawData:
             parsed = payments[col].map(parse_number)
             report.invalid[f"payments_{col}"] = int(parsed.isna().sum())
             payments[col] = parsed.fillna(0)
+    if {"PAYER", "BENEFICIARY"} <= set(payments.columns) and len(payments):
+        own = payments["PAYER"].astype(str).str.strip() == payments["BENEFICIARY"].astype(str).str.strip()
+        total = float(payments["PAY_AMT"].sum()) if "PAY_AMT" in payments.columns else 0.0
+        own_amt = float(payments.loc[own, "PAY_AMT"].sum()) if "PAY_AMT" in payments.columns else 0.0
+        report.invalid["self_transfers"] = {
+            "rows": int(own.sum()),
+            "amount_share": round(own_amt / total, 4) if total else 0.0,
+        }
+        payments = payments[~own].reset_index(drop=True)
+    if len(payments) and len(companies):
+        known = set(companies[COMPANY_KEY].astype(str))
+        unknown = (~payments["PAYER"].isin(known)) | (~payments["BENEFICIARY"].isin(known))
+        report.invalid["payments_with_unknown_counterparty"] = int(unknown.sum())
 
     return RawData(
         companies=companies.reset_index(drop=True), persons=persons, payments=payments, report=report

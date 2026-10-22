@@ -19,13 +19,21 @@ UI_DIST = ROOT / "ui" / "dist"
 async def lifespan(app: FastAPI):
     from app.seed import ensure_seeded
 
-    if get_settings().seed_on_start:
+    settings = get_settings()
+    if settings.seed_on_start:
         ensure_seeded()
     else:
         from app.db.session import init_db
 
         init_db()
+    sched = None
+    if settings.rss_enabled and settings.news_refresh_min > 0:
+        from app.worker import start_background
+
+        sched = start_background(settings.news_refresh_min)
     yield
+    if sched is not None:
+        sched.shutdown(wait=False)
 
 
 app = FastAPI(

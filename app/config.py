@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     embeddings: str = "off"
     session_secret: str = "dev-secret-change-me"
     rss_enabled: bool = False
+    news_refresh_min: int = 0
     seed_on_start: bool = True
     agent_top_n: int = 5
     feed_threshold: float = 0.35

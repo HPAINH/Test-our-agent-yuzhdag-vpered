@@ -20,6 +20,8 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
   const [drawer, setDrawer] = useState<{ id: string; quote?: string | null } | null>(null);
   const [tab, setTab] = useState<"chat" | "trace">("chat");
   const [voted, setVoted] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(false);
   const claims = useMemo(() => {
     const all: Claim[] = [
       ...s.what_happened, ...s.why_it_matters, ...s.consequences.risks, ...s.consequences.opportunities,
@@ -36,20 +38,39 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
     await api.feedback(b.insight_id, v, reason).catch(() => undefined);
     setVoted(v > 0 ? "Спасибо, отметили как полезное" : "Спасибо, учтём при проверке качества");
   };
+  const request = async (kind: "manager" | "callback" | "application", product?: string | null) => {
+    try {
+      const r = await api.createRequest({ kind, insight_id: b.insight_id, product });
+      setNotice(`${r.message} Номер обращения: ${r.id}. В прототипе заявка сохраняется в сервисе, CRM банка не вызывается.`);
+    } catch (e: any) {
+      setNotice(`Не удалось отправить: ${e.message}`);
+    }
+  };
+  const toggleHidden = async () => {
+    try {
+      if (hidden) await api.unhideEvent(b.event_id);
+      else await api.hideEvent(b.event_id);
+      setHidden(!hidden);
+    } catch (e: any) {
+      setNotice(`Не удалось изменить: ${e.message}`);
+    }
+  };
   const item = (c: Claim) => (
     <ClaimItem key={c.id} c={c} sources={data.sources} claims={claims} onOpen={open}>
       {c.bank_product_title && (
         <div className="offer">
           <span>
-            <b>Предложение банка:</b> {c.bank_product_title}
+            <b>Продукт банка, если уместен:</b> {c.bank_product_title}
           </span>
-          <button className="btn small" onClick={() => alert("В прототипе заявка не отправляется: это смоделированная интеграция с продуктами банка.")}>
-            Узнать условия
+          <button className="btn small" onClick={() => request("application", c.bank_product)}>
+            Оставить заявку
           </button>
         </div>
       )}
     </ClaimItem>
   );
+  const scale = data.impact_scale || {};
+  const impact = b.impact;
 
   const factorNames = b.factors.map((f) => data.factor_names[f] || f);
   const notRelevant = b.status === "not_relevant";
@@ -70,6 +91,21 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
             </div>
             <h1>{b.title}</h1>
             <p className="lead">{b.summary}</p>
+            {impact && !notRelevant && (
+              <div className="impact" title={scale[impact.level]?.meaning}>
+                <div>
+                  <div className="small muted">Влияние на компанию</div>
+                  <div className={`impact-level ${impact.level}`}>
+                    {scale[impact.level]?.label || impact.level}, {impact.score} из 100
+                  </div>
+                </div>
+                <div>
+                  <div className="small">{scale[impact.level]?.meaning}</div>
+                  <ul>{impact.basis.map((x) => <li key={x}>{x}</li>)}</ul>
+                  {impact.estimate && <div className="estimate">{impact.estimate}</div>}
+                </div>
+              </div>
+            )}
             {factorNames.length > 0 && (
               <div className="chips" style={{ marginTop: 12 }}>
                 {factorNames.map((f) => <span key={f} className="chip">{f}</span>)}
@@ -106,12 +142,29 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
           {!notRelevant && (
             <Section title="Что можно сделать" q="Направления действий">
               {s.actions.length ? s.actions.map(item) : <p className="missing">Конкретных действий не предложено.</p>}
+              <div className="cta-row">
+                <button className="btn small" onClick={() => request("manager")}>Обсудить с менеджером</button>
+                <button className="btn small" onClick={() => request("callback")}>Заказать обратный звонок</button>
+              </div>
+              {notice && <div className="notice" role="status">{notice}</div>}
             </Section>
           )}
 
           {!notRelevant && (
             <Section title="Как это оценивает банк" q="Центр макроэкономических исследований">
-              {s.bank_view.length ? s.bank_view.map(item) : <p className="missing">Аналитика банка по этой теме отсутствует.</p>}
+              {s.bank_view.length ? (
+                <>
+                  <p className="section-note">
+                    Здесь только цитаты из аналитики Альфа-Банка. Выводы и гипотезы выше подготовлены моделью и не являются
+                    позицией банка.
+                  </p>
+                  {s.bank_view.map(item)}
+                </>
+              ) : (
+                <p className="missing">
+                  Аналитики банка по этой теме нет. Все выводы и гипотезы выше подготовлены моделью и не являются позицией банка.
+                </p>
+              )}
             </Section>
           )}
 
@@ -147,12 +200,16 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
                 ))}
               </>
             )}
+            <button className="btn small ghost" style={{ marginLeft: "auto" }} onClick={toggleHidden}>
+              {hidden ? "Вернуть в ленту" : "Скрыть из ленты"}
+            </button>
             {onRegenerate && (
-              <button className="btn small ghost" style={{ marginLeft: "auto" }} onClick={onRegenerate}>
+              <button className="btn small ghost" onClick={onRegenerate}>
                 Пересобрать анализ
               </button>
             )}
           </div>
+          <p className="disclaimer">{data.disclaimer}</p>
         </div>
 
         <div className="rail">

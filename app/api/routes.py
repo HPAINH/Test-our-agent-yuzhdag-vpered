@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.chat import answer
 from app.agent.orchestrator import run_agent
-from app.api.auth import admin_user, audit, current_user, issue_token, limiter
+from app.api.auth import NOT_CLIENT, act_as, admin_user, audit, current_user, issue_token, limiter
 from app.api.launch import LaunchError, sign_launch, verify_launch
 from app.config import get_settings, load_factor_rules, load_yaml
 from app.db.models import (
@@ -20,10 +20,12 @@ from app.db.models import (
     Company,
     Event,
     Feedback,
+    HiddenEvent,
     Insight,
     LLMCall,
     Material,
     Relevance,
+    ServiceRequest,
     Trace,
     UIEvent,
 )
@@ -31,8 +33,20 @@ from app.db.session import get_db, session_scope
 from app.ingest.news import UnsafeURL, add_material, fetch_url
 from app.llm.client import get_llm
 from app.processing.pipeline import process_material
+from app.profile.store import accessible_companies, set_factor_hint
 from app.ranking.score import reference_time, score_event
-from app.schemas import AnalyzeIn, ChatIn, FeedbackIn, LaunchIn, LaunchLinkIn, LoginIn, UIEventIn
+from app.schemas import (
+    AnalyzeIn,
+    ChatIn,
+    CompanySwitchIn,
+    FactorHintIn,
+    FeedbackIn,
+    LaunchIn,
+    LaunchLinkIn,
+    LoginIn,
+    ServiceRequestIn,
+    UIEventIn,
+)
 
 router = APIRouter(prefix="/api/v1")
 PAGE_SIZE = 20
@@ -73,6 +87,9 @@ def user_dict(u: AppUser, db: Session) -> dict:
         "role_focus": roles.get(u.role, {}).get("focus"),
         "is_admin": u.is_admin,
         "company": company_brief(c) if c else None,
+        "companies": [
+            company_brief(x) for x in (db.get(Company, cid) for cid in accessible_companies(db, u)) if x
+        ],
     }
 
 
@@ -109,10 +126,22 @@ def card(ev: Event, rel: Relevance | None, ins: Insight | None, mats: dict[str, 
         "type": (ev.classification or {}).get("type"),
         "regions": (ev.classification or {}).get("regions", []),
         "stale": bool(ins and ins.stale),
+        "impact": (b or {}).get("impact"),
+        "hidden": False,
     }
 
 
-def _feed_rows(db: Session, user: AppUser, min_score: float):
+def hidden_ids(db: Session, user: AppUser) -> set[str]:
+    return set(
+        db.scalars(
+            select(HiddenEvent.event_id).where(
+                HiddenEvent.login == user.login, HiddenEvent.company_id == user.company_id
+            )
+        )
+    )
+
+
+def _feed_rows(db: Session, user: AppUser, min_score: float, hidden: str = "exclude"):
     rows = db.execute(
         select(Relevance, Event)
         .join(Event, Event.id == Relevance.event_id)
@@ -124,6 +153,11 @@ def _feed_rows(db: Session, user: AppUser, min_score: float):
         )
         .order_by(Relevance.score.desc())
     ).all()
+    hide = hidden_ids(db, user)
+    if hidden == "exclude":
+        rows = [(r, e) for r, e in rows if e.id not in hide]
+    elif hidden == "only":
+        rows = [(r, e) for r, e in rows if e.id in hide]
     ids = [e.id for _, e in rows]
     insights = {
         i.event_id: i
@@ -155,20 +189,39 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     if user is None:
         audit(db, body.login, "login", "denied")
         err(401, "unknown_user", "Учётная запись не найдена")
+    if not accessible_companies(db, user):
+        audit(db, user.login, "login", "denied", "not_client")
+        db.commit()
+        err(403, NOT_CLIENT["code"], NOT_CLIENT["message"])
+    user = act_as(db, user, None)
     audit(db, user.login, "login", "ok")
-    return {"token": issue_token(user.login), "user": user_dict(user, db)}
+    return {"token": issue_token(user.login, user.company_id), "user": user_dict(user, db)}
+
+
+@router.post("/auth/company")
+def switch_company(
+    body: CompanySwitchIn, user: AppUser = Depends(current_user), db: Session = Depends(get_db)
+):
+    if body.company_id not in accessible_companies(db, user):
+        audit(db, user.login, "switch_company", "denied", body.company_id)
+        db.commit()
+        err(403, "forbidden", "Нет доступа к этой компании")
+    user = act_as(db, user, body.company_id)
+    audit(db, user.login, "switch_company", "ok", body.company_id)
+    return {"token": issue_token(user.login, user.company_id), "user": user_dict(user, db)}
 
 
 @router.post("/auth/launch")
 def launch(body: LaunchIn, db: Session = Depends(get_db)):
     try:
-        user, target = verify_launch(db, body.launch_token)
+        user, target, company_id = verify_launch(db, body.launch_token)
     except LaunchError as e:
         audit(db, None, "launch", "denied", e.code)
         db.commit()
         err(401, e.code, e.message)
     audit(db, user.login, "launch", "ok", target)
-    return {"token": issue_token(user.login), "user": user_dict(user, db), "target": target}
+    user = act_as(db, user, company_id)
+    return {"token": issue_token(user.login, user.company_id), "user": user_dict(user, db), "target": target}
 
 
 @router.post("/host-demo/launch-link")
@@ -178,7 +231,11 @@ def host_demo_launch_link(body: LaunchLinkIn, db: Session = Depends(get_db)):
     user = db.get(AppUser, body.login)
     if user is None:
         err(404, "unknown_user", "Учётная запись не найдена")
-    token = sign_launch(user.login, user.company_id, body.target)
+    access = accessible_companies(db, user)
+    if not access:
+        err(403, NOT_CLIENT["code"], NOT_CLIENT["message"])
+    company = body.company_id if body.company_id in access else access[0]
+    token = sign_launch(user.login, company, body.target)
     return {"launch_token": token, "url": f"/#/launch?t={token}", "embed_url": f"/#/embed?t={token}"}
 
 
@@ -237,6 +294,7 @@ def widget(user: AppUser = Depends(current_user), db: Session = Depends(get_db))
 def feed(
     user: AppUser = Depends(current_user),
     db: Session = Depends(get_db),
+    hidden: str = Query(default="exclude", pattern="^(exclude|only|include)$"),
     factor: str | None = None,
     kind: str | None = Query(default=None, pattern="^(risk|opportunity|mixed)$"),
     horizon: str | None = None,
@@ -245,9 +303,10 @@ def feed(
     page: int = 1,
 ):
     rows, insights, mats = _feed_rows(
-        db, user, min_score if min_score is not None else get_settings().feed_threshold
+        db, user, min_score if min_score is not None else get_settings().feed_threshold, hidden
     )
-    cards = [card(e, r, insights.get(e.id), mats) for r, e in rows]
+    hide = hidden_ids(db, user)
+    cards = [{**card(e, r, insights.get(e.id), mats), "hidden": e.id in hide} for r, e in rows]
     if factor:
         cards = [c for c in cards if any(f["code"] == factor for f in c["factors"])]
     if kind:
@@ -296,6 +355,11 @@ def insight_payload(db: Session, ins: Insight) -> dict:
             "private": ev.private_to is not None,
         },
         "factor_names": names,
+        "disclaimer": load_yaml("interpretation.yaml")["disclaimer"],
+        "impact_scale": {
+            k: {"label": v["label"], "meaning": v["meaning"]}
+            for k, v in load_yaml("interpretation.yaml")["impact_scale"].items()
+        },
         "sources": {
             m.id: {
                 "id": m.id,
@@ -565,6 +629,107 @@ def feedback(body: FeedbackIn, user: AppUser = Depends(current_user), db: Sessio
 @router.post("/ui-events", status_code=204)
 def ui_event(body: UIEventIn, user: AppUser = Depends(current_user), db: Session = Depends(get_db)):
     db.add(UIEvent(user=user.login, kind=body.kind, ref=body.ref))
+
+
+@router.post("/events/{event_id}/hide", status_code=204)
+def hide_event(event_id: str, user: AppUser = Depends(current_user), db: Session = Depends(get_db)):
+    ev = db.get(Event, event_id)
+    if ev is None or not visible_event(ev, user):
+        err(404, "not_found", "Событие не найдено")
+    if db.get(HiddenEvent, (user.login, user.company_id, event_id)) is None:
+        db.add(HiddenEvent(login=user.login, company_id=user.company_id, event_id=event_id))
+    db.add(UIEvent(user=user.login, kind="hide_event", ref=event_id))
+
+
+@router.delete("/events/{event_id}/hide", status_code=204)
+def unhide_event(event_id: str, user: AppUser = Depends(current_user), db: Session = Depends(get_db)):
+    row = db.get(HiddenEvent, (user.login, user.company_id, event_id))
+    if row is not None:
+        db.delete(row)
+    db.add(UIEvent(user=user.login, kind="unhide_event", ref=event_id))
+
+
+REQUEST_MESSAGES = {
+    "manager": "Запрос передан вашему клиентскому менеджеру. Он свяжется с вами в рабочее время.",
+    "callback": "Заявка на обратный звонок принята. Менеджер перезвонит в рабочее время.",
+    "application": "Заявка принята. Менеджер уточнит условия и свяжется с вами.",
+}
+
+
+@router.post("/requests", status_code=201)
+def create_request(
+    body: ServiceRequestIn, user: AppUser = Depends(current_user), db: Session = Depends(get_db)
+):
+    limiter.check(user.login, "requests", 20)
+    if body.insight_id:
+        _own_insight(db, body.insight_id, user)
+    r = ServiceRequest(
+        login=user.login,
+        company_id=user.company_id,
+        insight_id=body.insight_id,
+        kind=body.kind,
+        product=body.product,
+        comment=body.comment,
+    )
+    db.add(r)
+    db.flush()
+    audit(db, user.login, "service_request", "ok", f"{body.kind}:{body.product or ''}")
+    return {
+        "id": r.id,
+        "status": r.status,
+        "message": REQUEST_MESSAGES[body.kind],
+        "simulated": True,
+    }
+
+
+@router.get("/requests")
+def my_requests(user: AppUser = Depends(current_user), db: Session = Depends(get_db)):
+    rows = db.scalars(
+        select(ServiceRequest)
+        .where(ServiceRequest.login == user.login, ServiceRequest.company_id == user.company_id)
+        .order_by(ServiceRequest.ts.desc())
+        .limit(50)
+    ).all()
+    return [
+        {
+            "id": r.id,
+            "ts": r.ts.isoformat(),
+            "kind": r.kind,
+            "product": r.product,
+            "insight_id": r.insight_id,
+            "status": r.status,
+        }
+        for r in rows
+    ]
+
+
+@router.put("/companies/me/factors/{factor}")
+def factor_hint(
+    factor: str, body: FactorHintIn, user: AppUser = Depends(current_user), db: Session = Depends(get_db)
+):
+    from app.profile.store import company_role_pairs
+    from app.ranking.score import rank_company
+
+    limiter.check(user.login, "factor_hint", 60)
+    company = db.get(Company, user.company_id)
+    try:
+        hints = set_factor_hint(db, company, factor, body.mode)
+    except KeyError:
+        err(404, "unknown_factor", "Такого фактора нет в каталоге")
+    roles = sorted(company_role_pairs(db).get(company.id, {user.role}))
+    rank_company(db, company, roles)
+    audit(db, user.login, "factor_hint", "ok", f"{factor}:{body.mode}")
+    return {"user_hints": hints, "profile_version": company.profile_version}
+
+
+@router.post("/admin/news/refresh", status_code=202)
+def refresh_news(user: AppUser = Depends(admin_user)):
+    import threading
+
+    from app.worker import cycle
+
+    threading.Thread(target=cycle, daemon=True).start()
+    return {"started": True, "rss_enabled": get_settings().rss_enabled}
 
 
 @router.get("/admin/metrics")

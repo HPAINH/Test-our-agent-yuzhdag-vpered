@@ -1,13 +1,19 @@
 import { Claim, SourceMeta, SourceRef } from "../api";
 
-export const KIND_LABEL: Record<string, string> = { fact: "Факт", bank: "Альфа-Банк", ai: "Вывод AI" };
+export const KIND_LABEL: Record<string, string> = {
+  fact: "Факт",
+  bank: "Альфа-Банк",
+  ai: "Вывод модели",
+  hypothesis: "Гипотеза",
+};
 
 export function KindLegend() {
   return (
     <div className="legend" aria-label="Обозначения">
       <span><b className="kind fact">Факт</b> подтверждено первоисточником</span>
-      <span><b className="kind bank">Альфа-Банк</b> позиция аналитиков банка</span>
-      <span><b className="kind ai">Вывод AI</b> интерпретация модели для вашей компании</span>
+      <span><b className="kind bank">Альфа-Банк</b> цитата аналитиков банка</span>
+      <span><b className="kind ai">Вывод модели</b> связь с вашей компанией; не позиция банка</span>
+      <span><b className="kind hypothesis">Гипотеза</b> возможный сценарий с основаниями, не прогноз</span>
     </div>
   );
 }

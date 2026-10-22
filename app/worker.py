@@ -1,6 +1,8 @@
 import logging
+import threading
 import time
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.config import get_settings
@@ -13,7 +15,21 @@ from app.seed import ensure_seeded, warm_insights
 log = logging.getLogger("worker")
 
 
+_lock = threading.Lock()
+LAST_CYCLE: dict = {}
+
+
 def cycle() -> None:
+    if not _lock.acquire(blocking=False):
+        log.info("cycle already running, skipped")
+        return
+    try:
+        _cycle()
+    finally:
+        _lock.release()
+
+
+def _cycle() -> None:
     settings = get_settings()
     t0 = time.perf_counter()
     stats = {}
@@ -25,7 +41,19 @@ def cycle() -> None:
     with session_scope() as s:
         stats["relevance_rows"] = rank_all(s)
     stats["insights"] = warm_insights()
-    log.info("cycle done in %.1fs: %s", time.perf_counter() - t0, stats)
+    stats["seconds"] = round(time.perf_counter() - t0, 1)
+    stats["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    LAST_CYCLE.clear()
+    LAST_CYCLE.update(stats)
+    log.info("cycle done: %s", stats)
+
+
+def start_background(minutes: int) -> BackgroundScheduler:
+    sched = BackgroundScheduler(daemon=True)
+    sched.add_job(cycle, "interval", minutes=minutes, max_instances=1, coalesce=True)
+    sched.add_job(cycle, "date")
+    sched.start()
+    return sched
 
 
 def main() -> None:

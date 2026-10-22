@@ -36,14 +36,35 @@ def workers_lower(grad: str) -> int | None:
     return int(digits[0]) if digits else None
 
 
+REVENUE_PLACEHOLDER_MAX = 1000
+
+
+def client_status(value: str) -> str:
+    v = _clean(value).lower()
+    if not v:
+        return "unknown"
+    if "бывш" in v or "закры" in v or "close" in v:
+        return "closed"
+    if "потенц" in v or "prospect" in v:
+        return "prospect"
+    if "действ" in v or v == "client":
+        return "client"
+    return "unknown"
+
+
 def normalize_company(row: dict, rules: dict) -> dict:
     flags = {col: parse_bool(row.get(col)) for col in BOOL_COLUMNS}
     revenue = parse_number(row.get("REVENUE_COMPANY"))
+    revenue_placeholder = revenue is not None and revenue <= REVENUE_PLACEHOLDER_MAX
+    if revenue_placeholder:
+        revenue = None
     industry = industry_for(row.get("MAINOKVED_CODE", ""), rules.get("industries", {}))
     workers = _clean(row.get("AMOUNT_WORKERS_FNS_GRADATION")) or _clean(
         row.get("AMOUNT_WORKERS_SPARK_GRADATION")
     )
     missing = [k for k, v in row.items() if _clean(v) == "" and k not in ("FTS_COUNTRY_NAME", "GROUP_ID")]
+    if revenue_placeholder:
+        missing.append("REVENUE_COMPANY")
     return {
         "company_id": _clean(row.get(COMPANY_KEY)),
         "industry": {
@@ -59,6 +80,7 @@ def normalize_company(row: dict, rules: dict) -> dict:
             "age": _clean(row.get("COMPANY_AGE_YEARS_GRADATION")),
             "stage": _clean(row.get("ECO_MARK_LABEL")),
             "client_type": _clean(row.get("CL_TYPE")),
+            "client_status": client_status(row.get("CL_TYPE")),
             "negative_mark": flags.get("NEGATIVEMARK"),
         },
         "scale": {
@@ -74,7 +96,10 @@ def normalize_company(row: dict, rules: dict) -> dict:
             "country": _clean(row.get("FTS_COUNTRY_NAME")) or None,
         },
         "group_id": _clean(row.get("GROUP_ID")) or None,
-        "data_quality": {"missing": missing},
+        "data_quality": {
+            "missing": missing,
+            "revenue_placeholder": revenue_placeholder,
+        },
     }
 
 
@@ -216,8 +241,6 @@ def build_profiles(raw: RawData) -> dict:
     for row in rows:
         p = normalize_company(row, rules)
         p["raw"] = row
-        rev = p["scale"]["revenue_rub"]
-        p["is_large"] = bool(rev is not None and rev > large)
         profiles[p["company_id"]] = p
 
     by_okved: dict[str, list] = defaultdict(list)
@@ -255,7 +278,22 @@ def build_profiles(raw: RawData) -> dict:
             if members
             else None,
             "sectors": sorted({profiles[m]["industry"]["sector_name"] for m in members}) if members else [],
+            "member_industries": [
+                {
+                    "company_id": m,
+                    "okved": profiles[m]["industry"]["okved"],
+                    "okved_name": profiles[m]["industry"]["name"],
+                }
+                for m in members
+                if m != cid
+            ],
         }
+        own_rev = p["scale"]["revenue_rub"]
+        group_rev = p["group"]["revenue_rub"]
+        basis_rev, basis = (group_rev, "group") if group_rev else (own_rev, "company")
+        p["is_large"] = bool(basis_rev is not None and basis_rev > large)
+        p["scale"]["large_basis"] = basis
+        p["scale"]["large_basis_revenue_rub"] = basis_rev
         same_group = set(members)
         p["implicit_links"] = [
             {"company_id": other, "via_person": via}
@@ -274,6 +312,7 @@ def build_profiles(raw: RawData) -> dict:
                         "sector": other["industry"]["sector"] if other else None,
                         "region": other["geo"]["region"] if other else None,
                         "same_group": cp["company_id"] in same_group,
+                        "known": other is not None,
                     }
                 )
         p["counterparties"] = cps

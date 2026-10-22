@@ -4,9 +4,22 @@ import { api, fmt } from "../api";
 export default function Quality() {
   const [m, setM] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState<string | null>(null);
   useEffect(() => {
     api.metrics().then(setM).catch((e) => setError(e.message));
   }, []);
+  const refreshNews = async () => {
+    try {
+      const r = await api.refreshNews();
+      setRefresh(
+        r.rss_enabled
+          ? "Сбор новостей запущен. Обновите страницу через минуту."
+          : "Живые источники выключены (RSS_ENABLED=false): будет пересчитан только текущий корпус.",
+      );
+    } catch (e: any) {
+      setRefresh(e.message);
+    }
+  };
   if (error) return <div className="error">{error}</div>;
   if (!m) return <div className="spinner">Загрузка…</div>;
   const ev = m.offline_eval;
@@ -62,6 +75,42 @@ export default function Quality() {
               <tr><td>Доля «данных недостаточно»</td><td>{fmt.pct(m.insights.insufficient_share)}</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="home-grid" style={{ marginTop: 18 }}>
+        <div className="panel panel-pad">
+          <h2>Продуктовые метрики</h2>
+          <table className="plain" style={{ marginTop: 10 }}>
+            <tbody>
+              <tr><td>Уровни влияния инсайтов</td><td>{Object.entries(m.product.impact_levels).map(([k, v]) => `${k}: ${v}`).join(", ")}</td></tr>
+              <tr><td>Обращений после инсайта</td><td>{m.product.requests_total} ({Object.entries(m.product.requests_by_kind).map(([k, v]) => `${k}: ${v}`).join(", ") || "—"})</td></tr>
+              <tr><td>Обращений на открытие инсайта</td><td>{m.product.request_rate_per_open ?? "—"}</td></tr>
+              <tr><td>Переходов к первоисточнику на открытие</td><td>{m.product.source_open_rate ?? "—"}</td></tr>
+              <tr><td>Скрытий на открытие (сигнал нерелевантности)</td><td>{m.product.hide_rate_per_open ?? "—"}</td></tr>
+              <tr><td>Компании по статусу в банке</td><td>{Object.entries(m.data_quality.client_status || {}).map(([k, v]) => `${k}: ${v}`).join(", ")}</td></tr>
+              <tr><td>Заглушки выручки</td><td>{m.data_quality.revenue_placeholders}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="panel panel-pad">
+          <h2>Источники новостей</h2>
+          <p className="small muted" style={{ marginTop: 6 }}>
+            Живой сбор: {m.news_sources.rss_enabled ? `включён, каждые ${m.news_sources.refresh_min || "—"} мин` : "выключен"}.
+            {m.news_sources.last_cycle && ` Последний цикл: ${m.news_sources.last_cycle.finished_at}, новых материалов ${m.news_sources.last_cycle.rss_added ?? 0}.`}
+          </p>
+          <table className="plain" style={{ marginTop: 10 }}>
+            <tbody>
+              {Object.entries(m.news_sources.sources).map(([id, s]: any) => (
+                <tr key={id}>
+                  <td>{s.name}</td>
+                  <td>{s.ok ? `работает, новых ${s.added ?? 0}` : `ошибка подряд: ${s.fails_in_row}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="btn small" style={{ marginTop: 12 }} onClick={refreshNews}>Обновить новости сейчас</button>
+          {refresh && <p className="small" style={{ marginTop: 8 }}>{refresh}</p>}
         </div>
       </div>
 

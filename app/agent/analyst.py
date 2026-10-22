@@ -3,7 +3,16 @@ from datetime import datetime
 
 from app.agent.context import RunContext
 from app.config import load_factor_rules, load_yaml
-from app.schemas import Claim, Consequences, Evidence, InsightBody, Sections, SourceRef, Verification
+from app.schemas import (
+    Claim,
+    Consequences,
+    Evidence,
+    Impact,
+    InsightBody,
+    Sections,
+    SourceRef,
+    Verification,
+)
 
 PRODUCES = {
     "metallurgy": "cmd_metals",
@@ -40,10 +49,13 @@ def feature_ref(driver: str, profile: dict) -> tuple[str, str] | None:
         if not cp:
             return None
         return f"PAYMENTS:{value}", phrases["COUNTERPARTY"].format(
-            cp_dir="покупатель" if cp["direction"] == "in" else "поставщик",
+            cp_dir="плательщик" if cp["direction"] == "in" else "получатель платежей",
+            cp_flow="входящих" if cp["direction"] == "in" else "исходящих",
             cp_share=round(cp["share"] * 100),
-            cp_okved_name=cp.get("okved_name") or "н/д",
+            cp_okved_name=cp.get("okved_name") or "нет в выборке",
         )
+    if key == "USER_INPUT":
+        return "USER_INPUT", phrases["USER_INPUT"]
     return key, f"{key}={value}"
 
 
@@ -111,22 +123,49 @@ def merge_refs(refs: list[tuple[str, str]], profile: dict) -> list[tuple[str, st
     for (direction, okved_name), items in cp_groups.items():
         share = round(sum(c["share"] for _, c in items) * 100)
         who = (
-            ("покупатели" if direction == "in" else "поставщики")
+            ("плательщики" if direction == "in" else "получатели платежей")
             if len(items) > 1
-            else ("покупатель" if direction == "in" else "поставщик")
+            else ("плательщик" if direction == "in" else "получатель платежей")
         )
         verb = "работают" if len(items) > 1 else "работает"
+        flow = "входящих" if direction == "in" else "исходящих"
         out.append(
             (
                 items[0][0],
-                f"ключевые {who} ({share}% {'входящих' if direction == 'in' else 'исходящих'} платежей) "
-                f"{verb} в отрасли «{okved_name or 'н/д'}»"
-                if len(items) > 1
-                else f"ключевой {who} ({share}% {'входящих' if direction == 'in' else 'исходящих'} платежей) "
-                f"{verb} в отрасли «{okved_name or 'н/д'}»",
+                f"{'крупные' if len(items) > 1 else 'крупный'} {who} ({share}% {flow} платежей) "
+                f"{verb} в отрасли «{okved_name or 'нет в выборке'}»",
             )
         )
     return out
+
+
+def assess_impact(ctx: RunContext, main: str | None, cfactors: dict, modality: str, has_bank: bool) -> Impact:
+    interp = load_yaml("interpretation.yaml")
+    scale = interp["impact_scale"]
+    rel = ctx.relevance or {}
+    score = round(100 * float(rel.get("score") or 0))
+    basis = [f"значимость события для компании {score} из 100"]
+    weight = cfactors.get(main, {}).get("weight", 0) if main else 0
+    if main:
+        name = load_factor_rules().get("catalog", {}).get(main, {}).get("name", main)
+        basis.append(f"вес фактора «{name}» для компании {weight:.2f} из 1")
+    direct = bool(rel.get("industry_match") or rel.get("region_match"))
+    if direct:
+        basis.append(rel.get("industry_match") or rel.get("region_match"))
+    basis.append("событие произошло" if modality == "fact" else "событие ожидается или обсуждается")
+    if has_bank:
+        basis.append("тема есть в аналитике банка")
+    level = "low"
+    for name in ("high", "medium"):
+        if score >= scale[name]["min_score"]:
+            level = name
+            break
+    if level == "high" and modality != "fact":
+        level = "medium"
+    if level == "low" and weight >= 0.7 and modality == "fact":
+        level = "medium"
+    estimate = interp.get("sensitivity", {}).get(main) if main and level != "low" else None
+    return Impact(level=level, score=score, basis=basis, estimate=estimate)
 
 
 class Draft:
@@ -203,11 +242,24 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
                 factor=factor,
             )
         )
-    if ctx.relevance.get("industry_match"):
+    match = ctx.relevance.get("industry_match")
+    if match and match.startswith("отрасль компании группы"):
+        g = profile.get("group") or {}
         why.append(
             d.claim(
                 "ai",
-                f"Событие напрямую касается отрасли: {ctx.relevance['industry_match']}.",
+                f"Событие касается {match}: последствия для одной компании группы {g.get('group_id')} "
+                f"могут затронуть и вашу через общую выручку, финансирование и внутригрупповые расчёты.",
+                [SourceRef(type="feature", id="GROUP_ID", label=g.get("group_id"))],
+            )
+        )
+        if "GROUP_ID" not in feature_ids:
+            feature_ids.append("GROUP_ID")
+    elif match:
+        why.append(
+            d.claim(
+                "ai",
+                f"Событие напрямую касается отрасли: {match}.",
                 [SourceRef(type="feature", id="MAINOKVED_CODE", label=profile["industry"].get("name"))],
             )
         )
@@ -260,7 +312,7 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
                     continue
                 watch.append(
                     d.claim(
-                        "ai",
+                        "hypothesis",
                         spec["mixed"].format(dir=dir_text).capitalize() + ".",
                         base_src + evidence,
                         factor=factor,
@@ -270,7 +322,9 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
             variant = f"{eff}_down" if direction == "down" and f"{eff}_down" in spec else eff
             text = spec.get(variant, spec.get(kind)).format(dir=dir_text)
             target = risks if kind == "risk" else opps
-            target.append(d.claim("ai", text[0].upper() + text[1:] + ".", base_src + evidence, factor=factor))
+            target.append(
+                d.claim("hypothesis", text[0].upper() + text[1:] + ".", base_src + evidence, factor=factor)
+            )
             pkind = (
                 kind
                 if not variant.endswith("_down")
@@ -311,7 +365,7 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
         date = (rel.get("published_at") or "")[:10]
         watch.append(
             d.claim(
-                "ai",
+                "hypothesis",
                 f"Связанный фактор «{name}»: {dir_text} (событие «{rel['title']}», {date}). "
                 f"Вместе с текущей новостью это усиливает общий эффект для компании.",
                 [
@@ -329,7 +383,7 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
         anchor = (risks or opps)[0]
         (risks if risks else opps).append(
             d.claim(
-                "ai",
+                "hypothesis",
                 f"Эффекты складываются: «{names[0]}» и «{names[1]}» действуют на компанию одновременно, "
                 f"поэтому оценивать их стоит вместе, а не по отдельности.",
                 [SourceRef(type="claim", id=anchor.id)]
@@ -410,6 +464,7 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
         + 0.1 * (len(used_factors) >= 2)
         + 0.1 * (len(ev.material_ids) > 1)
     )
+    impact = assess_impact(ctx, main, cfactors, modality, bool(bank))
     missing = []
     if not bank:
         missing.append("Аналитика банка по теме отсутствует")
@@ -443,6 +498,7 @@ def template_analyst(ctx: RunContext, issues: list[dict] | None = None) -> Insig
         factors=used_factors,
         polarity=polarity,
         horizon=horizon,
+        impact=impact,
         confidence=round(min(0.95, confidence), 2),
         verification=Verification(passed=False, iterations=0),
         status="ok",
@@ -461,7 +517,9 @@ ANALYST_SYSTEM = """Ты — аналитик Альфа-Банка для ру�
 2) Каждое утверждение — объект {"id","kind","text","sources":[{"type","id","quote"?}],"factor"?,"bank_product"?,"bank_product_title"?}.
    kind=fact — только факты из материалов (type=material, id из context.materials), с цитатой quote из текста.
    kind=bank — только то, что есть в аналитике банка (type=alfa, id из context.alfa), не приписывай банку лишнего.
-   kind=ai — твои выводы; sources — признаки компании (type=feature, id из context.features) и/или id других утверждений (type=claim).
+   kind=ai — твои выводы о связи события с компанией (why_it_matters, actions); sources — признаки компании (type=feature) и/или id других утверждений (type=claim).
+   kind=hypothesis — возможные последствия и сценарии (consequences): объясни логику и основания, без выдуманных вероятностей.
+   В bank_view — только kind=bank. Если твой вывод расходится с позицией банка, прямо напиши, что это вывод модели, а не позиция банка.
 3) why_it_matters ссылается минимум на 2 признака компании, а не только на отрасль.
 4) Последствия учитывают минимум 2 фактора (используй связанные события), это не пересказ новости.
 5) Действия конкретные, связанные с признаками компании; продукт банка — только из context.products.

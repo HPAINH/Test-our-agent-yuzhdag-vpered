@@ -24,5 +24,9 @@
     "LLM_BASE_URL": {
       "description": "OpenAI-совместимый адрес API организаторов"
     }
+  },
+  "containerEnv": {
+    "RSS_ENABLED": "true",
+    "NEWS_REFRESH_MIN": "30"
   }
 }

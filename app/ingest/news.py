@@ -157,10 +157,15 @@ def fetch_url(url: str) -> tuple[str, str]:
     return title, clean_text(text)[:20000]
 
 
+SOURCE_STATUS: dict[str, dict] = {}
+
+
 def fetch_rss(session: Session) -> int:
     sources = load_yaml("sources.yaml").get("rss", [])
     added = 0
     for src in sources:
+        status = SOURCE_STATUS.setdefault(src["id"], {"name": src["name"], "fails_in_row": 0})
+        status["checked_at"] = datetime.utcnow().isoformat(timespec="seconds")
         try:
             check_url(src["url"])
             with httpx.Client(timeout=10, follow_redirects=True) as client:
@@ -169,7 +174,9 @@ def fetch_rss(session: Session) -> int:
             feed = feedparser.parse(r.content)
         except Exception as exc:
             log.warning("rss %s failed: %s", src["id"], exc)
+            status.update(ok=False, error=str(exc)[:200], fails_in_row=status["fails_in_row"] + 1)
             continue
+        before = added
         for entry in feed.entries[:50]:
             text = entry.get("summary") or entry.get("description") or ""
             if entry.get("content"):
@@ -185,4 +192,6 @@ def fetch_rss(session: Session) -> int:
                 published_at=datetime(*published[:6]) if published else None,
             )
             added += 1 if m else 0
+        status.update(ok=True, error=None, fails_in_row=0, entries=len(feed.entries), added=added - before)
+        status["last_ok_at"] = status["checked_at"]
     return added

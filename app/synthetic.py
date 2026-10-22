@@ -160,8 +160,6 @@ def demo_companies() -> list[dict]:
             22.7,
             ekb,
             GROUP_ID="G_042",
-            CL_TYPE="Потенциальный клиент",
-            CL_PRODUCT_RKO_MARK=0,
             AMOUNT_WORKERS_FNS_GRADATION="500-999",
             AMOUNT_WORKERS_SPARK_GRADATION="",
             ECO_MARK_LABEL="Рост",
@@ -255,6 +253,8 @@ def payments(rng: random.Random, companies: list[dict]) -> list[dict]:
         ("U_DEMO_C", "U_G42_CEMENT", 4.9e9, 260),
         ("U_DEMO_C", "U_0009", 2.2e9, 120),
         ("U_DEMO_C", "U_0030", 1.4e9, 95),
+        ("U_DEMO_A", "U_DEMO_A", 186.0e9, 41),
+        ("U_DEMO_B", "U_EXT_404", 0.9e9, 57),
     ]
     rows = [{"BENEFICIARY": b, "PAYER": p, "PAY_AMT": int(a), "PAY_CNT": c} for p, b, a, c in fixed]
     ids = [c["SYNTHETIC_U"] for c in companies if c["SYNTHETIC_U"].startswith("U_0")]
@@ -313,6 +313,7 @@ USERS = [
         "login": "cfo_a",
         "display_name": "Ирина Соколова",
         "company_id": "U_DEMO_A",
+        "companies": ["U_G17_COAL", "U_G17_TRADE"],
         "role": "cfo",
         "is_admin": True,
     },
@@ -337,11 +338,20 @@ def _write_csv(path: Path, rows: list[dict], columns: list[str]) -> None:
         w.writerows(rows)
 
 
+def data_quirks() -> list[dict]:
+    blank = {c: "" for c in COLUMNS}
+    rows = [{**blank, "SYNTHETIC_U": "U_ANON", "CL_TYPE": "Потенциальный клиент"} for _ in range(12)]
+    rows[0]["CITY"] = "Москва"
+    rows.append(_row("U_STUB_REV", "46.72", 0, PLACES[0], REVENUE_COMPANY=1000))
+    rows.append(_row("U_CLOSED", "46.72", 5.2, PLACES[9], CL_TYPE="Бывший клиент", CL_PRODUCT_RKO_MARK=0))
+    return rows
+
+
 def generate(out: Path = OUT, seed: int = 2026) -> None:
     rng = random.Random(seed)
     out.mkdir(parents=True, exist_ok=True)
     companies = demo_companies() + background_companies(rng)
-    _write_csv(out / "df_Uid_data_hack.csv", companies, COLUMNS)
+    _write_csv(out / "df_Uid_data_hack.csv", companies + data_quirks(), COLUMNS)
     _write_csv(
         out / "df_Fid_Uid_link_hack.csv",
         persons(rng, companies),

@@ -6,7 +6,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import ROOT
-from app.db.models import Company, Event, Feedback, Insight, LLMCall, Material, Trace, UIEvent
+from app.db.models import (
+    Company,
+    Event,
+    Feedback,
+    HiddenEvent,
+    Insight,
+    LLMCall,
+    Material,
+    ServiceRequest,
+    Trace,
+    UIEvent,
+)
 from app.llm.client import get_llm
 
 
@@ -36,8 +47,21 @@ def collect_metrics(db: Session) -> dict:
         data_quality = {
             "companies": len(companies),
             "large": sum(1 for c in companies if c.is_large),
+            "large_by_group_revenue": sum(
+                1
+                for c in companies
+                if c.is_large and c.profile.get("scale", {}).get("large_basis") == "group"
+            ),
+            "client_status": dict(
+                Counter((c.profile.get("org") or {}).get("client_status", "unknown") for c in companies)
+            ),
+            "revenue_placeholders": sum(
+                1 for c in companies if (c.profile.get("data_quality") or {}).get("revenue_placeholder")
+            ),
             "missing_by_column": dict(missing.most_common(8)),
         }
+    requests = db.scalars(select(ServiceRequest)).all()
+    opened = ui.get("open_insight", 0)
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
         "corpus": {
@@ -84,6 +108,30 @@ def collect_metrics(db: Session) -> dict:
             ][:10],
         },
         "ui": dict(ui),
+        "news_sources": _sources(),
+        "product": {
+            "impact_levels": dict(Counter((i.body.get("impact") or {}).get("level", "n/a") for i in ok)),
+            "requests_total": len(requests),
+            "requests_by_kind": dict(Counter(r.kind for r in requests)),
+            "request_rate_per_open": round(len(requests) / opened, 3) if opened else None,
+            "hidden_total": db.scalar(select(func.count()).select_from(HiddenEvent)),
+            "hide_rate_per_open": round(ui.get("hide_event", 0) / opened, 3) if opened else None,
+            "source_open_rate": round(ui.get("open_source", 0) / opened, 3) if opened else None,
+        },
         "data_quality": data_quality,
         "offline_eval": json.loads(eval_path.read_text(encoding="utf-8")) if eval_path.exists() else None,
+    }
+
+
+def _sources() -> dict:
+    from app.config import get_settings
+    from app.ingest.news import SOURCE_STATUS
+    from app.worker import LAST_CYCLE
+
+    s = get_settings()
+    return {
+        "rss_enabled": s.rss_enabled,
+        "refresh_min": s.news_refresh_min,
+        "last_cycle": dict(LAST_CYCLE) or None,
+        "sources": SOURCE_STATUS,
     }

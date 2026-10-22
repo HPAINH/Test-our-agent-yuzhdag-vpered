@@ -2,6 +2,9 @@ users:
 - login: cfo_a
   display_name: Ирина Соколова
   company_id: U_DEMO_A
+  companies:
+  - U_G17_COAL
+  - U_G17_TRADE
   role: cfo
   is_admin: true
 - login: treasury_a

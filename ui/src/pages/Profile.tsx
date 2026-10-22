@@ -7,22 +7,56 @@ const PRODUCTS: Record<string, string> = {
   payroll: "Зарплатный проект", factoring: "Факторинг",
 };
 
+const STATUS: Record<string, string> = {
+  client: "действующий клиент",
+  prospect: "потенциальный клиент",
+  closed: "бывший клиент",
+  unknown: "нет данных",
+};
+
 export default function Profile() {
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [extra, setExtra] = useState("");
+  const load = () => api.profile().then(setD).catch((e) => setError(e.message));
   useEffect(() => {
-    api.profile().then(setD).catch((e) => setError(e.message));
+    load();
+    api.meta().then((m) => setNames(m.factors)).catch(() => undefined);
   }, []);
+  const hint = async (factor: string, mode: "boost" | "mute" | "reset") => {
+    setBusy(factor);
+    try {
+      await api.factorHint(factor, mode);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
   if (error) return <div className="error">{error}</div>;
   if (!d) return <div className="spinner">Загрузка…</div>;
   const p = d.profile;
+  const hints: Record<string, string> = p.user_hints || {};
+  const muted = Object.entries(hints).filter(([, m]) => m === "mute").map(([f]) => f);
+  const present = new Set(p.factors.map((f: any) => f.factor));
+  const addable = Object.keys(names).filter((f) => !present.has(f) && !muted.includes(f));
   const facts: [string, string][] = [
     ["Отрасль", `${p.industry.name} (ОКВЭД ${p.industry.okved})`],
-    ["Выручка", fmt.money(p.scale.revenue_rub)],
+    [
+      "Выручка за 2025 год",
+      p.data_quality?.revenue_placeholder ? "нет данных (в источнике техническая заглушка)" : fmt.money(p.scale.revenue_rub),
+    ],
+    [
+      "Сегмент",
+      `${p.is_large ? "крупный бизнес" : "средний бизнес"} — по выручке ${p.scale.large_basis === "group" ? "группы" : "компании"}: ${fmt.money(p.scale.large_basis_revenue_rub)}`,
+    ],
     ["Место в отрасли по данным банка", p.scale.rank_in_okved ? `${p.scale.rank_in_okved} из ${p.scale.peers_in_okved}` : "н/д"],
     ["Численность", p.scale.workers || "н/д"],
-    ["Регион", `${p.geo.region}, ${p.geo.city}`],
-    ["Тип клиента", p.org.client_type || "н/д"],
+    ["Регион и город обслуживания", `${p.geo.region}, ${p.geo.city}`],
+    ["Статус в банке", STATUS[p.org.client_status] || p.org.client_type || "н/д"],
     ["Стадия бизнеса", p.org.stage || "н/д"],
     ["ВЭД", p.foreign_trade.flag ? `да, ${p.foreign_trade.country || "страна не указана"}` : "нет"],
     ["Группа компаний", p.group?.member_count > 1 ? `${p.group.member_count} компании` : "нет"],
@@ -47,9 +81,13 @@ export default function Profile() {
 
       <div className="panel panel-pad" style={{ marginTop: 18 }}>
         <h2>Чувствительность к факторам</h2>
+        <p className="small muted" style={{ marginTop: 4 }}>
+          Уточните профиль: отметьте, что для компании важнее или что не учитывать. Отметки сохраняются как «указано
+          пользователем», меняют ранжирование ленты и видны в основаниях выводов.
+        </p>
         <div style={{ marginTop: 10 }}>
           {p.factors.map((f: any) => (
-            <div key={f.factor} className="factor-row">
+            <div key={f.factor} className="factor-row with-actions">
               <div>
                 <div>{f.name}</div>
                 <div className="small muted">{POL[f.polarity]}</div>
@@ -57,12 +95,46 @@ export default function Profile() {
               <div>
                 <div className={`fbar ${f.polarity}`}><i style={{ width: `${Math.round(f.weight * 100)}%` }} /></div>
                 <div className="small muted" style={{ marginTop: 4 }}>
-                  {f.drivers.filter((x: string) => x !== "base").join(", ") || "базовая чувствительность"}
+                  {f.drivers
+                    .filter((x: string) => x !== "base")
+                    .map((x: string) => (x.startsWith("USER_INPUT") ? "указано пользователем" : x))
+                    .join(", ") || "базовая чувствительность"}
                 </div>
               </div>
               <div style={{ textAlign: "right", fontWeight: 600 }}>{f.weight.toFixed(2)}</div>
+              <div className="factor-actions">
+                <button
+                  className={`btn small ${hints[f.factor] === "boost" ? "on" : ""}`}
+                  disabled={busy === f.factor}
+                  onClick={() => hint(f.factor, hints[f.factor] === "boost" ? "reset" : "boost")}
+                >
+                  Важно
+                </button>
+                <button className="btn small" disabled={busy === f.factor} onClick={() => hint(f.factor, "mute")}>
+                  Не учитывать
+                </button>
+              </div>
             </div>
           ))}
+        </div>
+        <div className="filters" style={{ marginTop: 12 }}>
+          <select className="input" value={extra} onChange={(e) => setExtra(e.target.value)} aria-label="Добавить фактор">
+            <option value="">Добавить важный фактор…</option>
+            {addable.map((f) => <option key={f} value={f}>{names[f]}</option>)}
+          </select>
+          <button className="btn small" disabled={!extra} onClick={() => { hint(extra, "boost"); setExtra(""); }}>
+            Добавить
+          </button>
+          {muted.length > 0 && (
+            <span className="small muted">
+              Не учитываются:{" "}
+              {muted.map((f) => (
+                <button key={f} className="btn small ghost" onClick={() => hint(f, "reset")}>
+                  {names[f] || f} ✕
+                </button>
+              ))}
+            </span>
+          )}
         </div>
       </div>
 
@@ -71,19 +143,23 @@ export default function Profile() {
           <h2>Ключевые контрагенты</h2>
           <table className="plain" style={{ marginTop: 10 }}>
             <thead>
-              <tr><th>Контрагент</th><th>Роль</th><th>Отрасль</th><th style={{ textAlign: "right" }}>Доля платежей</th></tr>
+              <tr><th>Контрагент</th><th>Платежи</th><th>Отрасль</th><th style={{ textAlign: "right" }}>Доля</th></tr>
             </thead>
             <tbody>
               {p.counterparties.map((c: any) => (
                 <tr key={c.company_id + c.direction}>
                   <td>{c.company_id}{c.same_group ? " (группа)" : ""}</td>
-                  <td>{c.direction === "in" ? "покупатель" : "поставщик"}</td>
-                  <td>{c.okved_name || "н/д"}</td>
+                  <td>{c.direction === "in" ? "входящие" : "исходящие"}</td>
+                  <td>{c.known === false ? "нет в выборке банка" : c.okved_name || "н/д"}</td>
                   <td style={{ textAlign: "right" }}>{fmt.pct(c.share)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className="small muted" style={{ marginTop: 10 }}>
+            Платежи показывают финансовое взаимодействие, но не его характер. Переводы между собственными счетами
+            компании исключены.
+          </p>
           {p.concentration?.length > 0 && (
             <p className="small" style={{ marginTop: 10, color: "var(--risk)" }}>
               Концентрация: на одного контрагента приходится больше 30% платежей.

@@ -21,6 +21,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://elbrus:elbrus@db:5432/elbrus
       SEED_ON_START: "true"
+      RSS_ENABLED: ${RSS_ENABLED:-true}
+      NEWS_REFRESH_MIN: ${NEWS_REFRESH_MIN:-30}
     ports:
       - "${APP_PORT:-8000}:8000"
     volumes:

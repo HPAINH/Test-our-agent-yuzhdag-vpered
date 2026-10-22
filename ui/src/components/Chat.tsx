@@ -76,6 +76,9 @@ export default function Chat({
           </button>
         ))}
       </div>
+      <p className="disclaimer" style={{ margin: "8px 16px 0" }}>
+        Ответы готовит модель по первоисточникам и аналитике банка; это не инвестиционная рекомендация.
+      </p>
       <form className="chat-form" onSubmit={submit}>
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Например: как это скажется на марже?" aria-label="Вопрос" />
         <button className="btn primary" disabled={busy || !text.trim()}>

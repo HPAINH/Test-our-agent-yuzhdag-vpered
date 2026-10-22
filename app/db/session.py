@@ -17,7 +17,9 @@ if _settings.database_url.startswith("sqlite:///"):
 engine = create_engine(
     _settings.database_url,
     pool_pre_ping=True,
-    connect_args={"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30}
+    if _settings.database_url.startswith("sqlite")
+    else {},
 )
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 current_session: ContextVar[Session | None] = ContextVar("current_session", default=None)
