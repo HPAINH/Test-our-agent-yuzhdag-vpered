@@ -102,10 +102,11 @@ def load_data(reset: bool = False) -> dict:
             stats["alfa_chunks"] = load_alfa_dir(
                 s, settings.alfa_path, synthetic=is_synthetic(settings.alfa_path)
             )
-        if settings.news_path.exists():
-            stats["news"] = load_news_dir(s, settings.news_path)
         if settings.rss_enabled:
             stats["rss"] = fetch_rss(s)
+        synthetic_news = is_synthetic(settings.news_path) and settings.data_path.name != "data_synthetic"
+        if settings.news_path.exists() and not (synthetic_news and stats.get("rss")):
+            stats["news"] = load_news_dir(s, settings.news_path)
     stats["companies"].pop("report", None)
     return stats
 

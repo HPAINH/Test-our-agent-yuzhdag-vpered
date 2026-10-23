@@ -64,6 +64,23 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 3)
 
 
+IMAGE_TOKENS = 1200
+
+
+def estimate_message_tokens(messages: list[dict]) -> int:
+    total = 0
+    for m in messages:
+        content = m["content"]
+        if isinstance(content, str):
+            total += estimate_tokens(content)
+            continue
+        for part in content:
+            total += (
+                IMAGE_TOKENS if part.get("type") == "image_url" else estimate_tokens(part.get("text", ""))
+            )
+    return total
+
+
 def extract_json(raw: str):
     raw = raw.strip()
     raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
@@ -190,7 +207,7 @@ class LLMClient:
             data = r.json()
         text = data["choices"][0]["message"]["content"] or ""
         usage = data.get("usage") or {}
-        tin = usage.get("prompt_tokens") or estimate_tokens(json.dumps(messages, ensure_ascii=False))
+        tin = usage.get("prompt_tokens") or estimate_message_tokens(messages)
         tout = usage.get("completion_tokens") or estimate_tokens(text)
         return text, tin, tout
 

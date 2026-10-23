@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -17,6 +18,7 @@ if _settings.database_url.startswith("sqlite:///"):
 engine = create_engine(
     _settings.database_url,
     pool_pre_ping=True,
+    json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False, separators=(",", ":")),
     connect_args={"check_same_thread": False, "timeout": 30}
     if _settings.database_url.startswith("sqlite")
     else {},

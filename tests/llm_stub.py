@@ -216,4 +216,6 @@ RESPONDERS = {
 def transport(purpose: str, model_key: str, messages: list[dict], json_mode: bool) -> tuple[str, int, int]:
     result = RESPONDERS[purpose](_payload(messages))
     text = json.dumps(result, ensure_ascii=False)
-    return text, len(json.dumps(messages, ensure_ascii=False)) // 3, len(text) // 3
+    from app.llm.client import estimate_message_tokens
+
+    return text, estimate_message_tokens(messages), len(text) // 3

@@ -11,7 +11,7 @@
 | TASK-005 | Разбор графиков в PDF Альфы через Qwen3-VL | TODO | — | — | — | TASK-002, TASK-003 | — |
 | TASK-007 | Точка входа из интернет-банка Альфа-Бизнес: ссылка входа, виджет, демо-хост | REVIEW | Claude | второй участник (Codex) | task/TASK-007-alfa-entry-point | TASK-001 | tasks/TASK-007.md, reports/TASK-007.md |
 | TASK-008 | Изменения по ответам вебинара: данные, доступ, гипотезы, шкала влияния, действия, уточнение профиля, живые новости | REVIEW | Claude | второй участник (Codex) | task/TASK-008-webinar | TASK-007 | tasks/TASK-008.md, reports/TASK-008.md |
-| TASK-009 | Сервис на моделях без подмены правилами, OCR, данные кейса | IN_PROGRESS | Claude | второй участник (Codex) | task/TASK-009-llm-ocr | TASK-008, данные кейса | tasks/TASK-009.md |
+| TASK-009 | Сервис на моделях без подмены правилами, OCR, данные кейса | REVIEW | Claude | второй участник (Codex) | task/TASK-009-llm-ocr | TASK-008, данные кейса | tasks/TASK-009.md, reports/TASK-009.md |
 | TASK-006 | Деплой на сервер команды, HTTPS, тег v1.0-final, видео | TODO | — | — | — | TASK-002 | — |
 
 Самопроверка TASK-001 выполнена; независимое ревью ещё не проводилось.

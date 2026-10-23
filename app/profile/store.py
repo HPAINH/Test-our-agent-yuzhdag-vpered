@@ -16,7 +16,6 @@ def load_companies(session: Session, data_dir: Path) -> dict:
     session.execute(delete(CompanyFactor))
     session.execute(delete(CompanyLink))
     existing = {c.id: c for c in session.scalars(select(Company))}
-    factor_batch: list[dict] = []
     fresh: list[dict] = []
     for cid, p in profiles.items():
         p.pop("raw", None)
@@ -26,7 +25,6 @@ def load_companies(session: Session, data_dir: Path) -> dict:
             p["user_hints"] = hints
             p["factors_base"] = p["factors"]
             p["factors"] = apply_hints(p["factors"], hints)
-        factor_batch.extend(factor_rows(cid, p["factors"]))
         fields = {
             "profile": p,
             "is_large": p["is_large"],
@@ -45,8 +43,6 @@ def load_companies(session: Session, data_dir: Path) -> dict:
     for i in range(0, len(fresh), 2000):
         session.execute(insert(Company), fresh[i : i + 2000])
     session.flush()
-    for i in range(0, len(factor_batch), 5000):
-        session.execute(insert(CompanyFactor), factor_batch[i : i + 5000])
     person_links = [
         {
             "src": link["src"],

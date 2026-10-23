@@ -42,7 +42,7 @@ fts_currency_weight: 0.6
 counterparty:
   min_share: 0.15
   factor_scale: 0.5
-  top_n: 10
+  top_n: 6
   concentration_threshold: 0.30
 
 large_business_revenue_rub: 15000000000

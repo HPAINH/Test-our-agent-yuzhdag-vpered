@@ -55,19 +55,18 @@ def clean_city(value: str) -> str:
 
 
 REVENUE_PLACEHOLDER_MAX = 1000
-GROUP_MEMBERS_KEPT = 30
-GROUP_INDUSTRIES_KEPT = 20
+GROUP_MEMBERS_KEPT = 15
+GROUP_INDUSTRIES_KEPT = 10
 
 
-def group_industries(members: list[str], cid: str, profiles: dict) -> list[dict]:
+def group_industries(ranked: list[str], cid: str, profiles: dict) -> list[dict]:
     out, seen = [], set()
-    ranked = sorted(members, key=lambda m: -(profiles[m]["scale"]["revenue_rub"] or 0))
     for m in ranked:
         okved = profiles[m]["industry"]["okved"]
         if m == cid or okved in seen:
             continue
         seen.add(okved)
-        out.append({"company_id": m, "okved": okved, "okved_name": profiles[m]["industry"]["name"]})
+        out.append({"company_id": m, "okved": okved})
         if len(out) == GROUP_INDUSTRIES_KEPT:
             break
     return out
@@ -299,17 +298,24 @@ def build_profiles(raw: RawData) -> dict:
             implicit[link["dst"]].add((link["src"], link["via"]))
 
     threshold = rules.get("counterparty", {}).get("concentration_threshold", 0.3)
+    group_info: dict[str, dict] = {}
+    for gid, members in groups.items():
+        ranked = sorted(members, key=lambda m: -(profiles[m]["scale"]["revenue_rub"] or 0))
+        group_info[gid] = {
+            "revenue": sum(profiles[m]["scale"]["revenue_rub"] or 0 for m in members),
+            "sectors": sorted({profiles[m]["industry"]["sector_name"] for m in members}),
+            "ranked": ranked[: GROUP_INDUSTRIES_KEPT * 4],
+        }
     for cid, p in profiles.items():
         members = groups.get(p["group_id"], []) if p["group_id"] else []
+        info = group_info.get(p["group_id"]) if members else None
         p["group"] = {
             "group_id": p["group_id"],
             "members": members[:GROUP_MEMBERS_KEPT],
             "member_count": len(members),
-            "revenue_rub": sum(profiles[m]["scale"]["revenue_rub"] or 0 for m in members)
-            if members
-            else None,
-            "sectors": sorted({profiles[m]["industry"]["sector_name"] for m in members}) if members else [],
-            "member_industries": group_industries(members, cid, profiles),
+            "revenue_rub": info["revenue"] if info else None,
+            "sectors": info["sectors"] if info else [],
+            "member_industries": group_industries(info["ranked"], cid, profiles) if info else [],
         }
         own_rev = p["scale"]["revenue_rub"]
         group_rev = p["group"]["revenue_rub"]
