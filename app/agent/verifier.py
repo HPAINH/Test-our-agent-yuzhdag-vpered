@@ -144,27 +144,34 @@ def programmatic_checks(body: InsightBody, ctx: RunContext) -> list[dict]:
 
 VERIFIER_SYSTEM = """Ты — независимый проверяющий. Тебе дают черновик инсайта и первоисточники.
 Проверь каждое утверждение kind=fact и kind=bank: подтверждается ли оно указанным источником (числа, даты, названия).
-Проверь утверждения kind=ai: не противоречат ли фактам и позиции банка, не пересказ ли это новости.
+Проверь утверждения kind=ai и kind=hypothesis: не противоречат ли фактам и позиции банка, не пересказ ли это новости,
+есть ли у гипотез основания. Утверждение kind=bank должно дословно опираться на отчёт банка.
 Верни JSON: {"issues": [{"claim": id, "code": "unsupported|contradiction|retelling|other", "why": "..."}]}.
 Если проблем нет — {"issues": []}."""
 
 
 def llm_check(body: InsightBody, ctx: RunContext):
-    from app.llm.client import get_llm
+    from app.llm.client import InvalidOutput, get_llm
 
     payload = {
         "draft": body.sections.model_dump(),
         "materials": {k: m.text[:2000] for k, m in list(ctx.materials.items())[:8]},
         "alfa": {k: m.text[:1500] for k, m in ctx.alfa.items()},
     }
+
+    def check(result):
+        if not isinstance(result, dict) or not isinstance(result.get("issues"), list):
+            raise InvalidOutput("ожидался объект с полем issues")
+        return result
+
     result, meta = get_llm().complete(
         "verifier",
         VERIFIER_SYSTEM,
         json.dumps(payload, ensure_ascii=False),
-        mock=lambda: {"issues": []},
         trace_id=ctx.trace_id,
+        validate=check,
     )
-    issues = result.get("issues", []) if isinstance(result, dict) else []
+    issues = result["issues"]
     known = {c.id for c in body.all_claims()}
     return [i for i in issues if isinstance(i, dict) and i.get("claim") in known], meta
 

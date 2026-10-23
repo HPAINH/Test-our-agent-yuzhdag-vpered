@@ -16,7 +16,8 @@ const STEP_LABEL: Record<string, string> = {
 };
 
 export default function Analyze({ user }: { user: User }) {
-  const [mode, setMode] = useState<"text" | "url">("text");
+  const [mode, setMode] = useState<"text" | "url" | "file">("text");
+  const [file, setFile] = useState<{ name: string; b64: string } | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -32,7 +33,12 @@ export default function Analyze({ user }: { user: User }) {
     setResult(null);
     setSteps([]);
     try {
-      const body = mode === "url" ? { url } : { text, title: title || undefined };
+      const body =
+        mode === "url"
+          ? { url }
+          : mode === "file" && file
+            ? { file_name: file.name, file_b64: file.b64, title: title || undefined }
+            : { text, title: title || undefined };
       const r = await analyzeStream(body, (s) => setSteps((x) => [...x, s]));
       setResult(r);
     } catch (err: any) {
@@ -54,8 +60,31 @@ export default function Analyze({ user }: { user: User }) {
           <div className="seg" role="group" aria-label="Способ ввода" style={{ marginBottom: 14 }}>
             <button type="button" className={mode === "text" ? "on" : ""} onClick={() => setMode("text")}>Текст</button>
             <button type="button" className={mode === "url" ? "on" : ""} onClick={() => setMode("url")}>Ссылка</button>
+            <button type="button" className={mode === "file" ? "on" : ""} onClick={() => setMode("file")}>Файл</button>
           </div>
-          {mode === "text" ? (
+          {mode === "file" ? (
+            <>
+              <label className="small muted" htmlFor="f">PDF, скан или фото документа (до 10 МБ)</label>
+              <input
+                id="f"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.txt"
+                style={{ display: "block", margin: "6px 0 10px" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return setFile(null);
+                  if (f.size > 10 * 1024 * 1024) {
+                    setError("Файл больше 10 МБ");
+                    return setFile(null);
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setFile({ name: f.name, b64: String(reader.result).split(",")[1] || "" });
+                  reader.readAsDataURL(f);
+                }}
+              />
+              <p className="small muted">Текст из сканов распознаётся OCR (Tesseract), затем анализируется моделью.</p>
+            </>
+          ) : mode === "text" ? (
             <>
               <label className="small muted" htmlFor="t">Заголовок (необязательно)</label>
               <input id="t" className="input wide" value={title} onChange={(e) => setTitle(e.target.value)} style={{ margin: "4px 0 12px" }} />
@@ -72,7 +101,10 @@ export default function Analyze({ user }: { user: User }) {
             </>
           )}
           <div style={{ marginTop: 16 }}>
-            <button className="btn primary" disabled={busy || (mode === "text" ? text.trim().length < 40 : !url.trim())}>
+            <button
+              className="btn primary"
+              disabled={busy || (mode === "text" ? text.trim().length < 40 : mode === "url" ? !url.trim() : !file)}
+            >
               {busy ? "Агент работает…" : "Проанализировать"}
             </button>
           </div>

@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.config import ROOT, get_settings
+from app.llm.client import BudgetExceeded, LLMError, LLMUnavailable
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 UI_DIST = ROOT / "ui" / "dist"
@@ -27,10 +28,10 @@ async def lifespan(app: FastAPI):
 
         init_db()
     sched = None
-    if settings.rss_enabled and settings.news_refresh_min > 0:
+    if settings.background_jobs:
         from app.worker import start_background
 
-        sched = start_background(settings.news_refresh_min)
+        sched = start_background(settings.news_refresh_min if settings.rss_enabled else 0)
     yield
     if sched is not None:
         sched.shutdown(wait=False)
@@ -56,6 +57,25 @@ async def http_error(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code, content={"error": {**detail, "details": detail.get("details")}}
     )
+
+
+@app.exception_handler(LLMError)
+async def llm_error(request: Request, exc: LLMError):
+    if isinstance(exc, LLMUnavailable):
+        code, status, message = (
+            "llm_unavailable",
+            503,
+            "Модели не подключены. Задайте LLM_BASE_URL и LLM_API_KEY.",
+        )
+    elif isinstance(exc, BudgetExceeded):
+        code, status, message = (
+            "llm_budget",
+            503,
+            "Дневной лимит расходов на модели исчерпан, сбросится в 00:00 UTC.",
+        )
+    else:
+        code, status, message = "llm_failed", 502, "Модель не вернула корректный ответ. Повторите позже."
+    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
 @app.exception_handler(RequestValidationError)

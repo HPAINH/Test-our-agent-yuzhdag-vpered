@@ -20,6 +20,7 @@ Python 3.12. Точные версии с зависимостями — в `uv.
 | APScheduler | 3.11.3 | расписание фоновых задач | MIT |
 | Beautiful Soup 4 | 4.15.0 | очистка HTML | MIT |
 | pytest, Ruff (dev) | 9.1.1, 0.17.1 | тесты и линтер | MIT |
+| Tesseract OCR (системный пакет, вызывается через PyMuPDF) | 5.x, языки rus, eng | распознавание сканов и изображений | Apache-2.0 |
 | sentence-transformers (опционально) | не установлен по умолчанию | эмбеддинги | Apache-2.0 |
 
 ## Frontend

@@ -31,7 +31,7 @@ from app.db.models import (
 )
 from app.db.session import get_db, session_scope
 from app.ingest.news import UnsafeURL, add_material, fetch_url
-from app.llm.client import get_llm
+from app.llm.client import InvalidOutput, LLMError, LLMUnavailable, get_llm
 from app.processing.pipeline import process_material
 from app.profile.store import accessible_companies, set_factor_hint
 from app.ranking.score import reference_time, score_event
@@ -175,7 +175,21 @@ def _feed_rows(db: Session, user: AppUser, min_score: float, hidden: str = "excl
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
     ok_db = db.scalar(select(func.count(AppUser.login))) is not None
-    return {"status": "ok" if ok_db else "degraded", "db": ok_db, "llm": get_llm().budget_state()}
+    from app.ingest.ocr import ocr_available
+    from app.worker import LAST_CYCLE
+
+    pending = db.scalar(
+        select(func.count(Material.id)).where(
+            Material.kind == "news", Material.event_id.is_(None), Material.status.is_(None)
+        )
+    )
+    return {
+        "status": "ok" if ok_db else "degraded",
+        "db": ok_db,
+        "llm": get_llm().budget_state(),
+        "ocr": ocr_available(),
+        "pipeline": {"pending_news": pending, "last_cycle": dict(LAST_CYCLE) or None},
+    }
 
 
 @router.get("/auth/users")
@@ -250,6 +264,7 @@ def meta(user: AppUser = Depends(current_user)):
         "factors": factor_names(),
         "roles": {k: v["name"] for k, v in load_yaml("roles.yaml")["roles"].items()},
         "llm_mode": get_llm().mode,
+        "llm": get_llm().budget_state(),
     }
 
 
@@ -267,6 +282,7 @@ def my_profile(user: AppUser = Depends(current_user), db: Session = Depends(get_
     return {
         "company": company_brief(c),
         "profile": p,
+        "summary_by_model": bool(c.summary),
         "group_members": group,
         "summary": c.summary,
         "profile_version": c.profile_version,
@@ -451,32 +467,49 @@ def digest(user: AppUser = Depends(current_user), db: Session = Depends(get_db))
     rows, insights, _ = _feed_rows(db, user, get_settings().feed_threshold)
     done = [(r, e, insights[e.id]) for r, e in rows if e.id in insights and insights[e.id].status == "ok"][:5]
     if not done:
-        return {"text": "Значимых событий для вашей компании пока нет.", "items": []}
-    risks = [i for _, _, i in done if i.body["polarity"] == "risk"]
-    opps = [i for _, _, i in done if i.body["polarity"] == "opportunity"]
-    names = factor_names()
-    top_factors = Counter(f for _, _, i in done for f in i.body["factors"]).most_common(3)
-    parts = [f"Главное для вас: «{done[0][2].body['title']}»."]
-    if risks:
-        parts.append(f"Рисков в фокусе: {len(risks)}, ключевой — «{risks[0].body['title']}».")
-    if opps:
-        parts.append(f"Возможностей: {len(opps)}, например «{opps[0].body['title']}».")
-    if top_factors:
-        parts.append(
-            "Чаще всего затронуты факторы: " + ", ".join(names.get(f, f) for f, _ in top_factors) + "."
-        )
-    bank = next(
-        (i.body["sections"]["bank_view"][0]["text"] for _, _, i in done if i.body["sections"]["bank_view"]),
-        None,
+        return {"text": "Значимых событий для вашей компании пока нет.", "items": [], "mode": None}
+    items = [
+        {
+            "insight_id": i.id,
+            "title": i.body["title"],
+            "summary": i.body["summary"],
+            "polarity": i.body["polarity"],
+            "impact": (i.body.get("impact") or {}).get("level"),
+            "bank_view": [c["text"] for c in i.body["sections"]["bank_view"][:1]],
+        }
+        for _, _, i in done
+    ]
+    roles = load_yaml("roles.yaml")["roles"]
+
+    def check(result):
+        if not isinstance(result, dict) or not str(result.get("text") or "").strip():
+            raise InvalidOutput("нет текста сводки")
+        return str(result["text"]).strip()
+
+    if not get_llm().available:
+        return {
+            "text": None,
+            "items": [{k: x[k] for k in ("insight_id", "title", "polarity")} for x in items],
+            "mode": "off",
+        }
+    text, meta = get_llm().complete(
+        "digest",
+        DIGEST_SYSTEM,
+        json.dumps(
+            {"role": roles.get(user.role, {}).get("name", user.role), "insights": items}, ensure_ascii=False
+        ),
+        validate=check,
     )
-    if bank:
-        parts.append(f"Позиция банка: {bank}")
     return {
-        "text": " ".join(parts),
-        "items": [
-            {"insight_id": i.id, "title": i.body["title"], "polarity": i.body["polarity"]} for _, _, i in done
-        ],
+        "text": text,
+        "items": [{k: x[k] for k in ("insight_id", "title", "polarity")} for x in items],
+        "mode": meta.mode,
     }
+
+
+DIGEST_SYSTEM = """Составь сводку дня для руководителя по готовым инсайтам его компании: 3–5 предложений,
+главное первым, сколько рисков и возможностей, что сделать сегодня. Только по данным из insights, без новых фактов.
+Позицию банка упоминай только если она есть в bank_view. Верни JSON: {"text": "..."}"""
 
 
 @router.get("/materials/{material_id}")
@@ -500,10 +533,32 @@ def material(material_id: str, user: AppUser = Depends(current_user), db: Sessio
 
 
 def _analyze(body: AnalyzeIn, user: AppUser, on_step=None) -> dict:
-    if not body.text and not body.url:
-        err(422, "empty", "Передайте текст или ссылку на новость")
+    if not body.text and not body.url and not body.file_b64:
+        err(422, "empty", "Передайте текст, ссылку или файл с новостью")
     title, text, url = body.title or "", body.text or "", None
-    if body.url and not body.text:
+    if body.file_b64 and not body.text:
+        import base64
+        import binascii
+
+        from app.ingest.ocr import document_text
+
+        try:
+            data = base64.b64decode(body.file_b64, validate=True)
+        except (binascii.Error, ValueError):
+            err(422, "bad_file", "Файл повреждён")
+        try:
+            text, method = document_text(body.file_name or "file.pdf", data)
+        except (ValueError, RuntimeError) as exc:
+            err(422, "bad_file", str(exc))
+        if on_step:
+            on_step(
+                {
+                    "kind": "ingest",
+                    "name": "ocr" if method == "ocr" else "extract",
+                    "output_summary": f"извлечено {len(text)} символов ({'OCR' if method == 'ocr' else 'текстовый слой'})",
+                }
+            )
+    if body.url and not body.text and not body.file_b64:
         try:
             title2, text = fetch_url(body.url)
             title, url = title or title2, body.url
@@ -578,6 +633,8 @@ def _analyze(body: AnalyzeIn, user: AppUser, on_step=None) -> dict:
 @router.post("/analyze")
 def analyze(body: AnalyzeIn, user: AppUser = Depends(current_user), stream: bool = False):
     limiter.check(user.login, "analyze", 20)
+    if not get_llm().available:
+        raise LLMUnavailable("модели не подключены")
     if not stream:
         return _analyze(body, user)
     q: queue.Queue = queue.Queue()
@@ -587,6 +644,10 @@ def analyze(body: AnalyzeIn, user: AppUser = Depends(current_user), stream: bool
             q.put(("result", _analyze(body, user, on_step=lambda s: q.put(("step", s)))))
         except HTTPException as exc:
             q.put(("error", exc.detail))
+        except LLMUnavailable:
+            q.put(("error", {"code": "llm_unavailable", "message": "Модели не подключены"}))
+        except LLMError as exc:
+            q.put(("error", {"code": "llm_failed", "message": str(exc)[:300]}))
         except Exception as exc:
             q.put(("error", {"code": "failed", "message": str(exc)}))
         q.put(("end", None))

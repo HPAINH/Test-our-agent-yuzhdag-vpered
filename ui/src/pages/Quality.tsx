@@ -62,7 +62,7 @@ export default function Quality() {
         <div className="panel panel-pad">
           <h2>Модели и бюджет</h2>
           <p style={{ marginTop: 10 }}>
-            Режим: <b>{b.mode === "live" ? "общий ключ (live)" : "детерминированный (mock)"}</b>. Расход сегодня: {b.spent_rub} из {b.limit_rub} ₽.
+            Модели: <b>{b.mode === "live" ? "подключены (общий ключ организаторов)" : b.mode === "stub" ? "тестовый двойник" : "не подключены"}</b>. Расход сегодня: {b.spent_rub} из {b.limit_rub} ₽.
           </p>
           <div className="bar" style={{ height: 8, marginTop: 8 }}><i style={{ width: fmt.pct(b.share), background: b.state === "ok" ? "var(--opp)" : "var(--risk)" }} /></div>
           <table className="plain" style={{ marginTop: 14 }}>

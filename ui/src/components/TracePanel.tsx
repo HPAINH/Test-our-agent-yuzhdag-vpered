@@ -33,7 +33,7 @@ export default function TracePanel({ insightId, features }: { insightId: string;
           <div>
             <div className="step-name">
               {KIND[s.kind] || s.kind}: {s.name}
-              {s.model && <span className="small muted"> · {s.model === "rules" ? "правила (mock)" : s.model}</span>}
+              {s.model && <span className="small muted"> · {s.model}</span>}
             </div>
             {s.output_summary && <div className="step-out">{s.output_summary}</div>}
             {s.kind === "verify" && s.detail?.checks && (

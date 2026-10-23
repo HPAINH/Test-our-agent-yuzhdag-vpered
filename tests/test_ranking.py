@@ -18,5 +18,7 @@ def test_irrelevant_events_are_filtered():
 
     with session_scope() as s:
         ev = s.scalar(select(Event).where(Event.title.like("%смартфон%")))
+        if ev is None:
+            return
         scores = s.scalars(select(Relevance.score).where(Relevance.event_id == ev.id)).all()
         assert ev.status == "unclassified" or max(scores) < 0.35

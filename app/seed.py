@@ -26,6 +26,8 @@ def warm_insights(limit: int | None = None) -> int:
         from app.profile.store import company_role_pairs
 
         pairs = {(cid, role) for cid, roles in company_role_pairs(s).items() for role in roles}
+    from app.llm.client import LLMError, LLMUnavailable
+
     for company_id, role in sorted(pairs):
         with session_scope() as s:
             company = s.get(Company, company_id)
@@ -40,14 +42,48 @@ def warm_insights(limit: int | None = None) -> int:
             for rel, ev in top_events(s, company_id, role, settings.feed_threshold, limit=limit, diversity=2):
                 if ev.id in existing:
                     continue
-                run_agent(s, ev, company, role, user=None, relevance={**rel.breakdown, "score": rel.score})
+                try:
+                    run_agent(
+                        s, ev, company, role, user=None, relevance={**rel.breakdown, "score": rel.score}
+                    )
+                except LLMUnavailable:
+                    return n
+                except LLMError as exc:
+                    log.warning("insight failed for %s/%s/%s: %s", company_id, role, ev.id, exc)
+                    continue
                 n += 1
     return n
 
 
-def seed(reset: bool = False, warm: bool = True) -> dict:
+def summarize_companies() -> int:
+    from app.llm.client import LLMError, get_llm
+    from app.profile.store import company_role_pairs
+    from app.profile.summary import summarize
+
+    if not get_llm().available:
+        return 0
+    n = 0
+    with session_scope() as s:
+        ids = sorted(company_role_pairs(s))
+    for cid in ids:
+        with session_scope() as s:
+            c = s.get(Company, cid)
+            if c is None or (c.summary and (c.profile or {}).get("summary_version") == c.profile_version):
+                continue
+            try:
+                c.summary = summarize(c)
+            except LLMError as exc:
+                log.warning("profile summary failed for %s: %s", cid, exc)
+                continue
+            p = dict(c.profile)
+            p["summary_version"] = c.profile_version
+            c.profile = p
+            n += 1
+    return n
+
+
+def load_data(reset: bool = False) -> dict:
     settings = get_settings()
-    t0 = time.perf_counter()
     if reset:
         reset_db()
     else:
@@ -64,18 +100,45 @@ def seed(reset: bool = False, warm: bool = True) -> dict:
         stats["users"] = load_users(s, settings.data_path)
         if settings.alfa_path.exists():
             stats["alfa_chunks"] = load_alfa_dir(
-                s, settings.alfa_path, synthetic="synthetic" in str(settings.alfa_path)
+                s, settings.alfa_path, synthetic=is_synthetic(settings.alfa_path)
             )
         if settings.news_path.exists():
             stats["news"] = load_news_dir(s, settings.news_path)
         if settings.rss_enabled:
             stats["rss"] = fetch_rss(s)
+    stats["companies"].pop("report", None)
+    return stats
+
+
+def is_synthetic(path) -> bool:
+    return "data_synthetic" in str(path)
+
+
+def run_ai_stage(warm: bool = True) -> dict:
+    from app.ingest.alfa import describe_charts
+    from app.llm.client import get_llm
+
+    settings = get_settings()
+    stats: dict = {"llm": get_llm().mode}
     with session_scope() as s:
         stats["pipeline"] = process_pending(s)
     with session_scope() as s:
         stats["relevance_rows"] = rank_all(s)
+    if not get_llm().available:
+        return stats
+    stats["summaries"] = summarize_companies()
+    if settings.alfa_path.exists():
+        with session_scope() as s:
+            stats["charts"] = describe_charts(s, settings.alfa_path, is_synthetic(settings.alfa_path))
     if warm:
         stats["insights"] = warm_insights()
+    return stats
+
+
+def seed(reset: bool = False, warm: bool = True) -> dict:
+    t0 = time.perf_counter()
+    stats = load_data(reset)
+    stats.update(run_ai_stage(warm))
     with session_scope() as s:
         stats["totals"] = {
             "materials": s.scalar(select(func.count(Material.id))),
@@ -83,17 +146,18 @@ def seed(reset: bool = False, warm: bool = True) -> dict:
             "insights": s.scalar(select(func.count(Insight.id))),
         }
     stats["seconds"] = round(time.perf_counter() - t0, 1)
-    stats["companies"].pop("report", None)
     return stats
 
 
-def ensure_seeded() -> None:
+def ensure_seeded() -> bool:
     init_db()
     with session_scope() as s:
         has_users = s.scalar(select(func.count(AppUser.login))) or 0
     if not has_users:
-        log.info("empty database: seeding")
-        log.info("seed: %s", seed(reset=False, warm=True))
+        log.info("empty database: loading data")
+        log.info("data: %s", load_data(reset=False))
+        return True
+    return False
 
 
 if __name__ == "__main__":

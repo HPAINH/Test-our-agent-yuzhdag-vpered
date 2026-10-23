@@ -68,6 +68,8 @@ class Material(Base):
     event_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)
     submitted_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    extraction: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class Event(Base):

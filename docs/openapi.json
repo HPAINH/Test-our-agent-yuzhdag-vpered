@@ -1536,6 +1536,30 @@
               }
             ],
             "title": "Title"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "file_b64": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 14000000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File B64"
           }
         },
         "type": "object",

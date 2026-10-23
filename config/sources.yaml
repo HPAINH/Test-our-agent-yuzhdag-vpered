@@ -10,3 +10,7 @@ fetch:
   timeout_s: 10
   max_bytes: 2000000
   user_agent: "ElbrusNewsInsights/1.0 (hackathon prototype)"
+
+prefilter:
+  min_hits: 1
+  max_per_cycle: 60

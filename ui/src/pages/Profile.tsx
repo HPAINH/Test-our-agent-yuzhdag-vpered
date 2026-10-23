@@ -65,6 +65,7 @@ export default function Profile() {
     <div>
       <h1>Профиль компании</h1>
       <p className="muted" style={{ marginTop: 6, maxWidth: 760 }}>
+        {d.summary && <span style={{ display: "block", marginBottom: 8, color: "var(--ink-2)" }}>{d.summary} <span className="small muted">(описание подготовлено моделью)</span></span>}
         По этим признакам сервис решает, какие события важны компании. Чувствительность к факторам рассчитана правилами
         из признаков и связей; у каждого веса видны основания.
       </p>

@@ -129,6 +129,10 @@ function Shell({
   const [menu, setMenu] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [badge, setBadge] = useState<number | null>(null);
+  const [llm, setLlm] = useState<{ mode: string; state: string } | null>(null);
+  useEffect(() => {
+    api.meta().then((m) => setLlm(m.llm)).catch(() => setLlm(null));
+  }, [user.login]);
 
   useEffect(() => {
     api.widget().then((w) => setBadge(w.new_count)).catch(() => setBadge(null));
@@ -217,6 +221,17 @@ function Shell({
             )}
           </div>
         </header>
+        {llm && llm.mode === "off" && (
+          <div className="llm-banner" role="alert">
+            Модели не подключены: новости не анализируются, инсайты, чат и проверка новостей недоступны. Администратору:
+            задайте LLM_BASE_URL и LLM_API_KEY и перезапустите сервис.
+          </div>
+        )}
+        {llm && llm.state === "exhausted" && (
+          <div className="llm-banner" role="alert">
+            Дневной лимит расходов на модели исчерпан. Готовые инсайты доступны, новые появятся после 00:00 UTC.
+          </div>
+        )}
         <main className="content" key={user.company.id}>
           <ErrorBoundary resetKey={route}>{children}</ErrorBoundary>
         </main>

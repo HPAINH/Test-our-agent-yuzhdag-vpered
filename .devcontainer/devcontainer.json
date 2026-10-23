@@ -15,7 +15,7 @@
       "onAutoForward": "openBrowser"
     }
   },
-  "postCreateCommand": "pip install --user uv && ~/.local/bin/uv sync && cd ui && npm ci && npm run build",
+  "postCreateCommand": "sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-rus && pip install --user uv && ~/.local/bin/uv sync && cd ui && npm ci && npm run build",
   "postStartCommand": "setsid nohup .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/app.log 2>&1 < /dev/null &",
   "secrets": {
     "LLM_API_KEY": {

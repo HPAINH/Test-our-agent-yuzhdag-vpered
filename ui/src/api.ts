@@ -191,7 +191,13 @@ export const api = {
       body: JSON.stringify({ launch_token }),
     }),
   me: () => request<User>("/me"),
-  meta: () => request<{ factors: Record<string, string>; roles: Record<string, string>; llm_mode: string }>("/meta"),
+  meta: () =>
+    request<{
+      factors: Record<string, string>;
+      roles: Record<string, string>;
+      llm_mode: string;
+      llm: { mode: string; state: string; spent_rub: number; limit_rub: number };
+    }>("/meta"),
   widget: () => request<{ top: FeedCard[]; total: number; new_count: number; risk_count: number; as_of: string }>("/home/widget"),
   feed: (params: Record<string, string>) =>
     request<{ items: FeedCard[]; total: number; page: number; page_size: number }>(
@@ -230,7 +236,7 @@ export const api = {
 };
 
 export async function analyzeStream(
-  body: { text?: string; url?: string; title?: string },
+  body: { text?: string; url?: string; title?: string; file_name?: string; file_b64?: string },
   onStep: (step: any) => void,
 ): Promise<InsightPayload> {
   const token = getToken();

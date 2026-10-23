@@ -68,7 +68,7 @@ def test_chat_answers_with_sources_and_refuses_offtopic(client, cfo_a):
     ).json()
     assert r["text"]
     r2 = client.post("/api/v1/chat", json={"message": "Какая погода в Сочи?"}, headers=cfo_a).json()
-    assert r2["mode"] == "refusal"
+    assert r2["type"] == "refusal"
 
 
 def test_feedback_and_metrics(client, cfo_a):
@@ -92,10 +92,33 @@ def test_chat_free_questions_about_card(client, cfo_a):
         "Какой прогноз по ставке?",
     ):
         r = client.post("/api/v1/chat", json={"message": q, "insight_id": ins}, headers=cfo_a).json()
-        assert r["mode"] not in ("refusal",) and len(r["text"]) > 40, (q, r)
+        assert r["type"] == "answer" and len(r["text"]) > 40 and r["claims"], (q, r)
     r = client.post(
         "/api/v1/chat", json={"message": "Какая погода в Сочи?", "insight_id": ins}, headers=cfo_a
     ).json()
-    assert r["mode"] == "refusal"
+    assert r["type"] == "refusal"
     r = client.post("/api/v1/chat", json={"message": "Привет"}, headers=cfo_a).json()
-    assert r["mode"] == "help"
+    assert r["type"] == "help"
+
+
+def test_chat_claims_only_cite_context_sources(client, cfo_a):
+    ins = client.get("/api/v1/feed", headers=cfo_a).json()["items"][0]["insight_id"]
+    card = client.get(f"/api/v1/insights/{ins}", headers=cfo_a).json()["insight"]
+    r = client.post("/api/v1/chat", json={"message": "Что делать?", "insight_id": ins}, headers=cfo_a).json()
+    known = set(card["sections"]["evidence"]["materials"]) | set(card["sections"]["evidence"]["alfa"])
+    known |= set(card["sections"]["evidence"]["features"])
+    for c in r["claims"]:
+        assert all(s["type"] in ("material", "alfa", "feature", "claim", "event") for s in c["sources"])
+    assert r["mode"] == "stub" and r["model"]
+
+
+def test_without_models_api_answers_503(client, cfo_a, monkeypatch):
+    from app.llm.client import get_llm
+
+    monkeypatch.setattr(get_llm(), "transport", None)
+    monkeypatch.setattr(get_llm().settings, "llm_base_url", "")
+    r = client.post("/api/v1/chat", json={"message": "Что с рисками?"}, headers=cfo_a)
+    assert r.status_code == 503 and r.json()["error"]["code"] == "llm_unavailable"
+    r = client.post("/api/v1/analyze", json={"text": "x" * 60}, headers=cfo_a)
+    assert r.status_code == 503
+    assert client.get("/api/v1/health").json()["llm"]["mode"] == "off"

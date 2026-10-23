@@ -12,11 +12,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = f"sqlite:///{ROOT / 'var' / 'app.db'}"
-    data_dir: str = str(ROOT / "data_synthetic")
+    data_dir: str = ""
     alfa_dir: str = ""
     news_dir: str = ""
 
-    llm_mode: str = "mock"
+    llm_mode: str = "live"
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_daily_budget_rub: float = 500.0
@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     session_secret: str = "dev-secret-change-me"
     rss_enabled: bool = False
     news_refresh_min: int = 0
+    ocr_languages: str = "rus+eng"
+    ocr_dpi: int = 300
+    ocr_min_chars: int = 200
+    vision_enabled: bool = True
+    background_jobs: bool = True
+    vision_max_pages_per_report: int = 4
     seed_on_start: bool = True
     agent_top_n: int = 5
     feed_threshold: float = 0.35
@@ -36,8 +42,11 @@ class Settings(BaseSettings):
 
     @property
     def data_path(self) -> Path:
-        p = Path(self.data_dir)
-        return p if p.is_absolute() else ROOT / p
+        if self.data_dir:
+            p = Path(self.data_dir)
+            return p if p.is_absolute() else ROOT / p
+        case = ROOT / "data"
+        return case if any(case.glob("*.csv")) else ROOT / "data_synthetic"
 
     @property
     def alfa_path(self) -> Path:

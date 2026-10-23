@@ -8,9 +8,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from app.config import get_settings
 from app.db.session import session_scope
 from app.ingest.news import fetch_rss
-from app.processing.pipeline import process_pending
-from app.ranking.score import rank_all
-from app.seed import ensure_seeded, warm_insights
+from app.seed import ensure_seeded, run_ai_stage
 
 log = logging.getLogger("worker")
 
@@ -36,11 +34,7 @@ def _cycle() -> None:
     if settings.rss_enabled:
         with session_scope() as s:
             stats["rss_added"] = fetch_rss(s)
-    with session_scope() as s:
-        stats["pipeline"] = process_pending(s)
-    with session_scope() as s:
-        stats["relevance_rows"] = rank_all(s)
-    stats["insights"] = warm_insights()
+    stats.update(run_ai_stage(warm=True))
     stats["seconds"] = round(time.perf_counter() - t0, 1)
     stats["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
     LAST_CYCLE.clear()
@@ -50,7 +44,8 @@ def _cycle() -> None:
 
 def start_background(minutes: int) -> BackgroundScheduler:
     sched = BackgroundScheduler(daemon=True)
-    sched.add_job(cycle, "interval", minutes=minutes, max_instances=1, coalesce=True)
+    if minutes > 0:
+        sched.add_job(cycle, "interval", minutes=minutes, max_instances=1, coalesce=True)
     sched.add_job(cycle, "date")
     sched.start()
     return sched

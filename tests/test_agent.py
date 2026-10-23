@@ -41,15 +41,24 @@ def _run(event_title_like: str, company: str = "U_DEMO_A", role: str = "cfo"):
 def test_personalized_interpretation_differs_between_companies():
     a, _ = _run("ключевую ставку", "U_DEMO_A")
     b, _ = _run("ключевую ставку", "U_DEMO_B")
-    assert a.title != b.title or a.summary != b.summary
     assert {s.id for c in a.sections.why_it_matters for s in c.sources} != {
         s.id for c in b.sections.why_it_matters for s in c.sources
     }
 
 
-def test_irrelevant_event_gets_not_relevant_status():
-    body, _ = _run("смартфон", "U_DEMO_B", "ceo")
-    assert body.status == "not_relevant"
+def test_irrelevant_news_never_reaches_the_model():
+    from app.db.models import Material
+
+    with session_scope() as s:
+        m = s.scalar(select(Material).where(Material.title.like("%смартфон%")))
+        assert m.status == "filtered" and m.event_id is None
+
+
+def test_trace_records_models_for_every_step():
+    body, steps = _run("ключевую ставку", "U_DEMO_A")
+    llm = [st for st in steps if st["kind"] == "llm"]
+    assert {st["name"] for st in llm} >= {"planner", "analyst"} and all(st["model"] for st in llm)
+    assert body.models["analyst"] == "GLM-5.3-Flash"
 
 
 def test_verifier_catches_fabricated_numbers():

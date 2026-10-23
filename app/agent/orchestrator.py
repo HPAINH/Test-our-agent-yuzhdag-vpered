@@ -6,13 +6,14 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agent.analyst import llm_analyst, template_analyst
+from app.agent.analyst import llm_analyst
 from app.agent.context import LIMITS, LimitExceeded, RunContext, Timer
 from app.agent.planner import make_plan
 from app.agent.tools import ToolError, call_tool
 from app.agent.verifier import drop_unsupported, verify
 from app.config import load_factor_rules
 from app.db.models import Company, Event, Insight, Material, Relevance, Trace
+from app.llm.client import LLMError, LLMUnavailable
 from app.ranking.score import reference_time, score_event
 from app.schemas import Claim, InsightBody, Sections, SourceRef, Verification
 
@@ -214,9 +215,25 @@ def run_agent(
                 )
     except LimitExceeded as exc:
         ctx.step("error", "limits", output_summary=str(exc), ok=False)
-        body = body or template_analyst(ctx)
-        body.status = "insufficient_data"
+        if body is None:
+            body = _not_relevant(ctx)
+            body.title = "Анализ не завершён"
+            body.sections.why_it_matters = []
+            body.status = "failed"
+        else:
+            body.status = "insufficient_data"
         body.missing.append("Исчерпан лимит запуска агента")
+    except LLMUnavailable:
+        raise
+    except LLMError as exc:
+        ctx.step("error", "llm", output_summary=str(exc)[:300], ok=False)
+        if body is None:
+            body = _not_relevant(ctx)
+            body.title = "Модели не смогли подготовить анализ"
+            body.summary = "Повторите позже: модель не вернула корректный ответ."
+            body.sections.why_it_matters = []
+        body.status = "failed"
+        body.missing.append("Модель не вернула корректный ответ")
     except Exception as exc:
         log.exception("agent failed")
         ctx.step("error", "exception", output_summary=str(exc), ok=False)

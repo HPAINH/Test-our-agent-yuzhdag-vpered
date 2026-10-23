@@ -298,3 +298,4 @@ html:has(.embed), body:has(.embed) { background: transparent; }
 .factor-actions .btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .factor-row.with-actions { grid-template-columns: 220px 1fr 64px 220px; }
 @media (max-width: 900px) { .factor-row.with-actions { grid-template-columns: 1fr 60px; } .factor-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+.llm-banner { background: var(--risk-soft); color: var(--risk); border-bottom: 1px solid #f3d3bd; padding: 10px 32px; font-size: 14px; }

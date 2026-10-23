@@ -1,0 +1,52 @@
+# Каталог продуктов банка, которые модель может предложить в действиях (смоделированная интеграция).
+# when — для риска или возможности по фактору; needs_feature / unless_feature — условие по признаку компании.
+products:
+- factor: key_rate
+  when: risk
+  code: refinancing
+  title: Рефинансирование и кредит с фиксированной ставкой
+  needs_feature: CL_PRODUCT_LOA_MARK
+- factor: key_rate
+  when: opportunity
+  code: deposit
+  title: Депозит с фиксированной ставкой
+  unless_feature: CL_PRODUCT_DEP_MARK
+- factor: fx_usd
+  when: risk
+  code: fx_hedge
+  title: Валютный форвард и хеджирование
+- factor: fx_usd
+  when: opportunity
+  code: fx_hedge
+  title: Валютный форвард и хеджирование
+- factor: fx_cny
+  when: risk
+  code: fx_hedge
+  title: Валютный форвард в юанях
+- factor: fx_cny
+  when: opportunity
+  code: fx_hedge
+  title: Валютный форвард в юанях
+- factor: fx_eur
+  when: risk
+  code: fx_hedge
+  title: Валютный форвард
+- factor: consumer_demand
+  when: risk
+  code: factoring
+  title: Факторинг для ускорения оборачиваемости
+  unless_feature: FACTORING_MARK
+- factor: labor
+  when: risk
+  code: payroll
+  title: Зарплатный проект
+  unless_feature: CL_PRODUCT_ZPP_MARK
+- factor: regulation
+  when: risk
+  code: guarantee
+  title: Банковская гарантия для контрактов
+  needs_feature: CL_PRODUCT_GAR_MARK
+- factor: sanctions_trade
+  when: risk
+  code: ved
+  title: ВЭД-сопровождение и аккредитивы

@@ -33,7 +33,13 @@ class Claim(BaseModel):
             raise ValueError(f"claim {self.id}: fact requires a material source")
         if self.kind == "bank" and "alfa" not in types:
             raise ValueError(f"claim {self.id}: bank requires an alfa source")
-        if self.kind in ("ai", "hypothesis") and not types & {"feature", "claim", "material", "alfa"}:
+        if self.kind in ("ai", "hypothesis") and not types & {
+            "feature",
+            "claim",
+            "material",
+            "alfa",
+            "event",
+        }:
             raise ValueError(f"claim {self.id}: {self.kind} requires feature or claim source")
         return self
 
@@ -168,6 +174,8 @@ class AnalyzeIn(BaseModel):
     text: str | None = Field(default=None, max_length=20000)
     url: str | None = Field(default=None, max_length=2000)
     title: str | None = Field(default=None, max_length=500)
+    file_name: str | None = Field(default=None, max_length=200)
+    file_b64: str | None = Field(default=None, max_length=14_000_000)
 
 
 class ChatIn(BaseModel):

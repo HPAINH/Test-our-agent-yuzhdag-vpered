@@ -184,7 +184,7 @@ export default function InsightView({ data, onRegenerate }: { data: InsightPaylo
             </div>
             <p className="small muted" style={{ marginTop: 10 }}>
               Проверка: {b.verification.passed ? "все проверки пройдены" : "есть замечания"}
-              {b.verification.iterations > 0 && `, доработок: ${b.verification.iterations}`}. Модели: {Object.values(b.models).filter((v, i, a) => a.indexOf(v) === i).map((v) => (v === "rules" ? "правила (mock-режим)" : v)).join(", ") || "—"}.
+              {b.verification.iterations > 0 && `, доработок: ${b.verification.iterations}`}. Модели: {Object.values(b.models).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "—"}.
             </p>
           </Section>
 

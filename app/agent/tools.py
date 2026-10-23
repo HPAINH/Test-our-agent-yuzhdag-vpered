@@ -203,34 +203,24 @@ def t_get_related_events(session: Session, ctx: RunContext, factor: str, days: i
 
 
 def t_get_bank_products(session: Session, ctx: RunContext, need: str | None = None) -> list[dict]:
-    interp = load_yaml("interpretation.yaml")["factors"]
     flags = ctx.profile.get("flags", {})
-    potential = "потенциал" in (ctx.profile.get("org", {}).get("client_type") or "").lower()
     out = []
-    for factor, spec in interp.items():
-        if need and factor != need:
+    for prod in load_yaml("products.yaml")["products"]:
+        if need and prod["factor"] != need:
             continue
-        for kind in ("risk", "opportunity"):
-            prod = spec.get(f"product_{kind}")
-            if not prod:
-                continue
-            if prod.get("needs_feature") and not flags.get(prod["needs_feature"]) and not potential:
-                continue
-            if prod.get("unless_feature") and flags.get(prod["unless_feature"]):
-                continue
-            out.append(
-                {
-                    "factor": factor,
-                    "kind": kind,
-                    "code": prod["code"],
-                    "title": prod["title"],
-                    "reason": f"needs={prod.get('needs_feature')}"
-                    if prod.get("needs_feature")
-                    else f"has_not={prod.get('unless_feature')}"
-                    if prod.get("unless_feature")
-                    else "general",
-                }
-            )
+        if prod.get("needs_feature") and not flags.get(prod["needs_feature"]):
+            continue
+        if prod.get("unless_feature") and flags.get(prod["unless_feature"]):
+            continue
+        out.append(
+            {
+                "factor": prod["factor"],
+                "kind": prod["when"],
+                "code": prod["code"],
+                "title": prod["title"],
+                "condition": prod.get("needs_feature") or prod.get("unless_feature") or "general",
+            }
+        )
     ctx.products = out
     return out
 

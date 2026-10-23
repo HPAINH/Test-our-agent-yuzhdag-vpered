@@ -144,11 +144,46 @@ def company_role_pairs(session: Session) -> dict[str, set]:
     return pairs
 
 
+DEMO_ROLES = [("cfo", "Финансовый директор"), ("ceo", "Генеральный директор"), ("treasurer", "Казначей")]
+
+
+def demo_users(session: Session, n_companies: int = 3) -> list[dict]:
+    companies = [
+        c
+        for c in session.scalars(select(Company))
+        if (c.profile.get("org") or {}).get("client_status") == "client" and c.revenue_rub
+    ]
+    companies.sort(key=lambda c: -(c.profile["scale"].get("large_basis_revenue_rub") or c.revenue_rub or 0))
+    picked, sectors = [], set()
+    for c in companies:
+        sector = c.profile["industry"].get("sector")
+        if sector in sectors:
+            continue
+        picked.append(c)
+        sectors.add(sector)
+        if len(picked) == n_companies:
+            break
+    users = []
+    for i, c in enumerate(picked):
+        for role, title in DEMO_ROLES[: 2 if i else 3]:
+            users.append(
+                {
+                    "login": f"{role}_{i + 1}",
+                    "display_name": f"{title} · {c.id}",
+                    "company_id": c.id,
+                    "role": role,
+                    "is_admin": i == 0 and role == "cfo",
+                }
+            )
+    return users
+
+
 def load_users(session: Session, data_dir: Path) -> int:
     path = data_dir / "users.yaml"
-    if not path.exists():
-        return 0
-    users = yaml.safe_load(path.read_text(encoding="utf-8")).get("users", [])
+    if path.exists():
+        users = yaml.safe_load(path.read_text(encoding="utf-8")).get("users", [])
+    else:
+        users = demo_users(session)
     n = 0
     for u in users:
         if session.get(Company, u["company_id"]) is None:

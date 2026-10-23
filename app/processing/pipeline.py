@@ -7,8 +7,10 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings, load_yaml
 from app.db.models import Event, Material
-from app.processing.classify import classify, extract_facts
+from app.llm.client import LLMError, get_llm
+from app.processing.classify import classify, needs_llm, to_facts
 from app.processing.text import BM25, best_sentence, stems
 from app.schemas import EventClassification
 
@@ -99,15 +101,13 @@ def process_material(
     index: tuple[BM25, dict] | None = None,
     cache: dict | None = None,
 ) -> tuple[Event, dict]:
-    cls, meta = classify(m.title, m.text)
+    cls, raw_facts, meta = classify(m.title, m.text)
     vec = material_vector(m)
     cache = cache if cache is not None else {}
     ev = None if private_to else _event_for(session, m, cls, vec, cache)
     if ev is not None:
         ev.material_ids = [*ev.material_ids, m.id]
-        facts = ev.facts + [
-            f.model_dump() for f in extract_facts(m.id, m.title, m.text, cls.factors, limit=2)
-        ]
+        facts = ev.facts + [f.model_dump() for f in to_facts(m.id, raw_facts, limit=2)]
         ev.facts = facts[:6]
         cache[ev.id] = cache.get(ev.id, Counter()) + vec
         m.event_id = ev.id
@@ -120,7 +120,7 @@ def process_material(
         title=clean_title or m.title,
         material_ids=[m.id],
         classification=cls.model_dump(),
-        facts=[f.model_dump() for f in extract_facts(m.id, m.title, m.text, cls.factors)],
+        facts=[f.model_dump() for f in to_facts(m.id, raw_facts)],
         published_at=m.published_at,
         status="ok" if cls.factors else "unclassified",
         private_to=private_to,
@@ -134,21 +134,45 @@ def process_material(
 
 
 def process_pending(session: Session) -> dict:
+    if not get_llm().available:
+        return {"skipped": "модели не подключены"}
+    limit = load_yaml("sources.yaml").get("prefilter", {}).get("max_per_cycle", 60)
     pending = session.scalars(
         select(Material)
-        .where(Material.kind == "news", Material.event_id.is_(None), Material.submitted_by.is_(None))
-        .order_by(Material.published_at)
+        .where(
+            Material.kind == "news",
+            Material.event_id.is_(None),
+            Material.submitted_by.is_(None),
+            Material.status.is_(None),
+        )
+        .order_by(Material.published_at.desc())
     ).all()
     index = alfa_index(session)
     cache: dict = {}
-    created = merged = 0
-    for m in pending:
+    created = merged = filtered = failed = 0
+    batch = sorted(pending[:limit], key=lambda x: x.published_at or x.collected_at)
+    for m in batch:
+        if not needs_llm(m.title, m.text):
+            m.status = "filtered"
+            filtered += 1
+            continue
         try:
             _, meta = process_material(session, m, index=index, cache=cache)
-        except Exception as exc:
-            log.exception("processing failed for %s: %s", m.id, exc)
+        except LLMError as exc:
+            log.warning("classification failed for %s: %s", m.id, exc)
+            failed += 1
+            if "лимит" in str(exc) or "не подключены" in str(exc):
+                break
             continue
         merged += meta["merged"]
         created += not meta["merged"]
     session.flush()
-    return {"processed": len(pending), "events_created": created, "merged": merged}
+    return {
+        "pending": len(pending),
+        "events_created": created,
+        "merged": merged,
+        "filtered_out": filtered,
+        "failed": failed,
+        "deferred": max(0, len(pending) - limit),
+        "threshold_score": get_settings().feed_threshold,
+    }
