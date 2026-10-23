@@ -1,0 +1,32 @@
+users:
+- login: cfo_a
+  display_name: Ирина Соколова
+  company_id: U_9250
+  companies: [U_140205, U_187725]
+  role: cfo
+  is_admin: true
+- login: treasury_a
+  display_name: Павел Ким
+  company_id: U_9250
+  role: treasurer
+- login: accountant_a
+  display_name: Елена Громова
+  company_id: U_9250
+  role: accountant
+- login: ceo_b
+  display_name: Андрей Лебедев
+  company_id: U_19717
+  role: ceo
+- login: cfo_b
+  display_name: Мария Орлова
+  company_id: U_19717
+  companies: [U_147819]
+  role: cfo
+- login: cfo_c
+  display_name: Тимур Валиев
+  company_id: U_118422
+  role: cfo
+- login: owner_c
+  display_name: Сергей Абрамов
+  company_id: U_118422
+  role: owner

@@ -187,7 +187,7 @@ function Shell({
                 aria-label="Компания"
               >
                 {user.companies.map((c) => (
-                  <option key={c.id} value={c.id}>{nameOf(c.id)}</option>
+                  <option key={c.id} value={c.id}>{nameOf(c.id, c.sector || c.industry)}</option>
                 ))}
               </select>
             ) : (
@@ -248,10 +248,10 @@ const COMPANY_NAMES: Record<string, string> = {
   U_DEMO_C: "Девелопер «В» (демо)",
 };
 
-export function nameOf(id: string) {
-  return COMPANY_NAMES[id] || `Компания ${id}`;
+export function nameOf(id: string, industry?: string) {
+  return COMPANY_NAMES[id] || (industry ? `${industry} · ${id}` : `Компания ${id}`);
 }
 
 export function companyName(u: User) {
-  return nameOf(u.company.id);
+  return nameOf(u.company.id, u.company.sector || u.company.industry);
 }

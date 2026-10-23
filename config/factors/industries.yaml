@@ -91,3 +91,31 @@ industries:
     sector: health
     name: Здравоохранение
     factors: {regulation: [0.5, mixed], labor: [0.4, risk]}
+  "56":
+    sector: food_service
+    name: Общественное питание
+    factors: {consumer_demand: [0.7, mixed], inflation: [0.5, risk], labor: [0.4, risk], real_estate: [0.2, risk]}
+  "64":
+    sector: finance
+    name: Финансовые услуги
+    factors: {key_rate: [0.7, mixed], bonds: [0.5, mixed], regulation: [0.4, risk]}
+  "70":
+    sector: holding
+    name: Управление холдингами и консалтинг
+    factors: {key_rate: [0.3, risk], regulation: [0.3, risk], consumer_demand: [0.2, mixed]}
+  "71":
+    sector: engineering
+    name: Инжиниринг и технические изыскания
+    factors: {real_estate: [0.4, mixed], regulation: [0.3, risk], key_rate: [0.2, risk]}
+  "72":
+    sector: research
+    name: Научные исследования и разработки
+    factors: {regulation: [0.3, mixed], fx_usd: [0.2, risk]}
+  "47.30":
+    sector: fuel_retail
+    name: Розничная торговля топливом
+    factors: {cmd_oil: [0.8, mixed], regulation: [0.4, risk], consumer_demand: [0.4, mixed], inflation: [0.3, risk]}
+  "46.71":
+    sector: fuel_wholesale
+    name: Оптовая торговля топливом
+    factors: {cmd_oil: [0.8, mixed], logistics: [0.4, risk], regulation: [0.4, risk], key_rate: [0.2, risk]}

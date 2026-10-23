@@ -15,6 +15,7 @@ log = logging.getLogger("worker")
 
 _lock = threading.Lock()
 LAST_CYCLE: dict = {}
+STATE = {"loading_data": False}
 
 
 def cycle() -> None:
@@ -42,11 +43,20 @@ def _cycle() -> None:
     log.info("cycle done: %s", stats)
 
 
-def start_background(minutes: int) -> BackgroundScheduler:
+def bootstrap() -> None:
+    STATE["loading_data"] = True
+    try:
+        ensure_seeded()
+    finally:
+        STATE["loading_data"] = False
+    cycle()
+
+
+def start_background(minutes: int, bootstrap: bool = True) -> BackgroundScheduler:
     sched = BackgroundScheduler(daemon=True)
     if minutes > 0:
         sched.add_job(cycle, "interval", minutes=minutes, max_instances=1, coalesce=True)
-    sched.add_job(cycle, "date")
+    sched.add_job(globals()["bootstrap"] if bootstrap else cycle, "date")
     sched.start()
     return sched
 

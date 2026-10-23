@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import yaml
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 
 from app.config import load_factor_rules
@@ -16,39 +16,51 @@ def load_companies(session: Session, data_dir: Path) -> dict:
     session.execute(delete(CompanyFactor))
     session.execute(delete(CompanyLink))
     existing = {c.id: c for c in session.scalars(select(Company))}
+    factor_batch: list[dict] = []
+    fresh: list[dict] = []
     for cid, p in profiles.items():
-        raw = p.pop("raw")
+        p.pop("raw", None)
         c = existing.get(cid)
         hints = (c.profile or {}).get("user_hints") if c is not None else None
         if hints:
             p["user_hints"] = hints
             p["factors_base"] = p["factors"]
             p["factors"] = apply_hints(p["factors"], hints)
-        factors = p["factors"]
+        factor_batch.extend(factor_rows(cid, p["factors"]))
+        fields = {
+            "profile": p,
+            "is_large": p["is_large"],
+            "group_id": p["group_id"],
+            "okved": p["industry"]["okved"],
+            "revenue_rub": p["scale"]["revenue_rub"],
+        }
         if c is None:
-            c = Company(id=cid)
-            session.add(c)
-        elif c.profile and c.profile != p:
+            fresh.append({"id": cid, "raw": {}, "profile_version": 1, **fields})
+            continue
+        if c.profile and c.profile != p:
             c.profile_version += 1
             session.query(Insight).filter(Insight.company_id == cid).update({"stale": True})
-        c.raw = {k: (None if v == "" else v) for k, v in raw.items()}
-        c.profile = p
-        c.is_large = p["is_large"]
-        c.group_id = p["group_id"]
-        c.okved = p["industry"]["okved"]
-        c.revenue_rub = p["scale"]["revenue_rub"]
-        write_factors(session, cid, factors)
-    for link in result["links"]:
-        session.add(
-            CompanyLink(
-                src=link["src"],
-                dst=link["dst"],
-                kind=link["kind"],
-                amount=link.get("amount", 0),
-                count=link.get("count", 0),
-                via=link.get("via"),
-            )
-        )
+        for k, v in fields.items():
+            setattr(c, k, v)
+    for i in range(0, len(fresh), 2000):
+        session.execute(insert(Company), fresh[i : i + 2000])
+    session.flush()
+    for i in range(0, len(factor_batch), 5000):
+        session.execute(insert(CompanyFactor), factor_batch[i : i + 5000])
+    person_links = [
+        {
+            "src": link["src"],
+            "dst": link["dst"],
+            "kind": link["kind"],
+            "amount": link.get("amount", 0),
+            "count": link.get("count", 0),
+            "via": link.get("via"),
+        }
+        for link in result["links"]
+        if link["kind"] == "person"
+    ]
+    if person_links:
+        session.execute(insert(CompanyLink), person_links)
     session.flush()
     return {"companies": len(profiles), "links": len(result["links"]), "report": result["report"]}
 
@@ -85,18 +97,23 @@ def apply_hints(base: list[dict], hints: dict) -> list[dict]:
     return sorted(out, key=lambda x: -x["weight"])
 
 
+def factor_rows(company_id: str, factors: list[dict]) -> list[dict]:
+    return [
+        {
+            "company_id": company_id,
+            "factor": f["factor"],
+            "weight": f["weight"],
+            "polarity": f["polarity"],
+            "drivers": f["drivers"],
+        }
+        for f in factors
+    ]
+
+
 def write_factors(session: Session, company_id: str, factors: list[dict]) -> None:
     session.execute(delete(CompanyFactor).where(CompanyFactor.company_id == company_id))
-    for f in factors:
-        session.add(
-            CompanyFactor(
-                company_id=company_id,
-                factor=f["factor"],
-                weight=f["weight"],
-                polarity=f["polarity"],
-                drivers=f["drivers"],
-            )
-        )
+    if factors:
+        session.execute(insert(CompanyFactor), factor_rows(company_id, factors))
 
 
 def set_factor_hint(session: Session, company: Company, factor: str, mode: str) -> dict:

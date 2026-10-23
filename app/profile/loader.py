@@ -102,7 +102,7 @@ def dedupe_companies(companies: pd.DataFrame, report: LoadReport) -> pd.DataFram
         if len(values.drop_duplicates()) == 1:
             exact.append(cid)
             keep.append(rows.index[0])
-        elif filled.max() < 0.5:
+        elif filled.max() < 0.5 or len(rows) >= 3:
             artifacts.append(cid)
         else:
             conflicts.append(cid)

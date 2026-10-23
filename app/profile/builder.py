@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 import pandas as pd
@@ -29,14 +30,47 @@ def industry_for(okved: str, industries: dict) -> dict:
 
 
 def workers_lower(grad: str) -> int | None:
-    g = _clean(grad).replace(" ", "")
+    g = _clean(grad).lower().replace(" ", "")
     if not g:
         return None
     digits = "".join(ch if ch.isdigit() else " " for ch in g).split()
-    return int(digits[0]) if digits else None
+    if not digits:
+        return None
+    if g.startswith("менее") or g.startswith("до"):
+        return 0
+    return int(digits[0])
+
+
+def split_countries(value: str) -> list[str]:
+    out = []
+    for part in re.split(r"[,;/]", _clean(value)):
+        name = part.strip()
+        if name:
+            out.append(name if not name.isupper() or len(name) <= 3 else name.capitalize())
+    return out
+
+
+def clean_city(value: str) -> str:
+    return re.sub(r"^(г\.|город)\s*", "", _clean(value)).strip()
 
 
 REVENUE_PLACEHOLDER_MAX = 1000
+GROUP_MEMBERS_KEPT = 30
+GROUP_INDUSTRIES_KEPT = 20
+
+
+def group_industries(members: list[str], cid: str, profiles: dict) -> list[dict]:
+    out, seen = [], set()
+    ranked = sorted(members, key=lambda m: -(profiles[m]["scale"]["revenue_rub"] or 0))
+    for m in ranked:
+        okved = profiles[m]["industry"]["okved"]
+        if m == cid or okved in seen:
+            continue
+        seen.add(okved)
+        out.append({"company_id": m, "okved": okved, "okved_name": profiles[m]["industry"]["name"]})
+        if len(out) == GROUP_INDUSTRIES_KEPT:
+            break
+    return out
 
 
 def client_status(value: str) -> str:
@@ -88,12 +122,13 @@ def normalize_company(row: dict, rules: dict) -> dict:
             "workers": workers or None,
             "workers_lower": workers_lower(workers),
         },
-        "geo": {"region": _clean(row.get("REGION")), "city": _clean(row.get("CITY"))},
+        "geo": {"region": _clean(row.get("REGION")), "city": clean_city(row.get("CITY"))},
         "products": {PRODUCT_KEYS[k]: flags.get(k) for k in PRODUCT_KEYS},
         "flags": flags,
         "foreign_trade": {
-            "flag": bool(flags.get("FTS_FLAG")),
-            "country": _clean(row.get("FTS_COUNTRY_NAME")) or None,
+            "flag": bool(flags.get("FTS_FLAG")) or bool(split_countries(row.get("FTS_COUNTRY_NAME"))),
+            "country": ", ".join(split_countries(row.get("FTS_COUNTRY_NAME"))) or None,
+            "countries": split_countries(row.get("FTS_COUNTRY_NAME")),
         },
         "group_id": _clean(row.get("GROUP_ID")) or None,
         "data_quality": {
@@ -137,16 +172,22 @@ def factor_vector(profile: dict, counterparties: list[dict], rules: dict, all_pr
         _add(acc, "labor", wr.get("labor_add", 0.2), "risk", f"WORKERS={profile['scale']['workers']}")
         _add(acc, "inflation", wr.get("inflation_add", 0.1), "risk", f"WORKERS={profile['scale']['workers']}")
     if profile["foreign_trade"]["flag"]:
-        cur_map = rules.get("fts_currency", {})
-        country = profile["foreign_trade"]["country"] or ""
-        factor = cur_map.get(country, cur_map.get("default", "fx_usd"))
-        _add(
-            acc,
-            factor,
-            rules.get("fts_currency_weight", 0.6),
-            "mixed",
-            f"FTS_COUNTRY_NAME={country or 'н/д'}",
-        )
+        cur_map = {k.lower(): v for k, v in rules.get("fts_currency", {}).items()}
+        countries = profile["foreign_trade"].get("countries") or [""]
+        weight = rules.get("fts_currency_weight", 0.6)
+        seen = set()
+        for country in countries:
+            factor = cur_map.get(country.lower(), cur_map.get("default", "fx_usd"))
+            if factor in seen:
+                continue
+            _add(
+                acc,
+                factor,
+                weight if not seen else weight * 0.6,
+                "mixed",
+                f"FTS_COUNTRY_NAME={country or 'н/д'}",
+            )
+            seen.add(factor)
     cp_rules = rules.get("counterparty", {})
     for cp in counterparties:
         if cp["share"] < cp_rules.get("min_share", 0.15):
@@ -203,16 +244,6 @@ def build_graph(raw: RawData, ids: set[str], rules: dict) -> tuple[dict, list[di
                         "share": round(share, 4),
                     }
                 )
-                if direction == "out":
-                    links.append(
-                        {
-                            "src": company,
-                            "dst": cp,
-                            "kind": "payment",
-                            "amount": float(amount),
-                            "count": int(count),
-                        }
-                    )
     for company in by_company:
         by_company[company] = sorted(by_company[company], key=lambda x: -x["amount"])
     persons = raw.persons
@@ -272,21 +303,13 @@ def build_profiles(raw: RawData) -> dict:
         members = groups.get(p["group_id"], []) if p["group_id"] else []
         p["group"] = {
             "group_id": p["group_id"],
-            "members": members,
+            "members": members[:GROUP_MEMBERS_KEPT],
             "member_count": len(members),
             "revenue_rub": sum(profiles[m]["scale"]["revenue_rub"] or 0 for m in members)
             if members
             else None,
             "sectors": sorted({profiles[m]["industry"]["sector_name"] for m in members}) if members else [],
-            "member_industries": [
-                {
-                    "company_id": m,
-                    "okved": profiles[m]["industry"]["okved"],
-                    "okved_name": profiles[m]["industry"]["name"],
-                }
-                for m in members
-                if m != cid
-            ],
+            "member_industries": group_industries(members, cid, profiles),
         }
         own_rev = p["scale"]["revenue_rub"]
         group_rev = p["group"]["revenue_rub"]

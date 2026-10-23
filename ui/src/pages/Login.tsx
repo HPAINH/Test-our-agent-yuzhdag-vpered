@@ -59,7 +59,12 @@ export default function Login({ onLogin, notice }: { onLogin: (u: User) => void;
               <span className="small muted">{busy === u.login ? "Вход…" : "Войти"}</span>
             </button>
           ))}
-          {!users.length && !error && <div className="spinner">Загрузка пользователей…</div>}
+          {!users.length && !error && (
+            <div className="spinner">
+              Загружаем данные кейса: 85 тыс. компаний и 1,4 млн платежей. Первый запуск занимает несколько минут —
+              обновите страницу чуть позже.
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@ feature_rules:
   - {feature: FTS_FLAG, value: true, factor: logistics, add: 0.2, polarity: risk}
 
 workers_rules:
-  min_large: 1000
+  min_large: 251
   labor_add: 0.2
   inflation_add: 0.1
 
@@ -27,6 +27,14 @@ fts_currency:
   Италия: fx_eur
   Франция: fx_eur
   Нидерланды: fx_eur
+  Испания: fx_eur
+  Австрия: fx_eur
+  Бельгия: fx_eur
+  Литва: fx_eur
+  Латвия: fx_eur
+  Эстония: fx_eur
+  Финляндия: fx_eur
+  Польша: fx_eur
   default: fx_usd
 
 fts_currency_weight: 0.6

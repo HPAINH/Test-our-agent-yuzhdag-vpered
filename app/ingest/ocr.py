@@ -1,7 +1,11 @@
 import glob
+import hashlib
+import json
 import logging
 import os
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 from app.config import get_settings
@@ -24,15 +28,54 @@ def ocr_available() -> bool:
     return bool(shutil.which("tesseract") and tessdata_dir())
 
 
-def _ocr_page(page) -> str:
+OCR_VERSION = "tess-psm3-v1"
+
+
+def _ocr_png(png: bytes) -> str:
     settings = get_settings()
-    tp = page.get_textpage_ocr(
-        language=settings.ocr_languages, dpi=settings.ocr_dpi, full=True, tessdata=tessdata_dir()
-    )
-    return page.get_text("text", textpage=tp)
+    with tempfile.TemporaryDirectory() as tmp:
+        img = Path(tmp) / "page.png"
+        img.write_bytes(png)
+        env = {**os.environ, "TESSDATA_PREFIX": tessdata_dir() or ""}
+        out = subprocess.run(
+            ["tesseract", str(img), "stdout", "-l", settings.ocr_languages, "--psm", "3"],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=env,
+            check=False,
+        )
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip()[:300])
+    return out.stdout
+
+
+def _ocr_page(page) -> str:
+    return _ocr_png(page.get_pixmap(dpi=get_settings().ocr_dpi).tobytes("png"))
+
+
+def _cache_file(path: Path) -> Path:
+    digest = hashlib.sha256(path.read_bytes() + OCR_VERSION.encode()).hexdigest()[:16]
+    return path.parent / ".ocr_cache" / f"{path.stem}.{digest}.json"
 
 
 def pdf_pages(data: bytes | Path) -> list[dict]:
+    if isinstance(data, Path):
+        cache = _cache_file(data)
+        if cache.exists():
+            return json.loads(cache.read_text(encoding="utf-8"))
+        pages = _pdf_pages(data)
+        if any(p["method"] == "ocr" for p in pages):
+            try:
+                cache.parent.mkdir(exist_ok=True)
+                cache.write_text(json.dumps(pages, ensure_ascii=False), encoding="utf-8")
+            except OSError as exc:
+                log.warning("cannot write OCR cache: %s", exc)
+        return pages
+    return _pdf_pages(data)
+
+
+def _pdf_pages(data: bytes | Path) -> list[dict]:
     import pymupdf
 
     doc = pymupdf.open(data) if isinstance(data, Path) else pymupdf.open(stream=data, filetype="pdf")
@@ -60,7 +103,7 @@ def image_text(data: bytes) -> str:
 
     if not ocr_available():
         raise RuntimeError("Tesseract не установлен: распознавание изображений недоступно")
-    img = pymupdf.open(stream=data, filetype="png")
+    img = pymupdf.open(stream=data)
     pdf = pymupdf.open("pdf", img.convert_to_pdf())
     return _ocr_page(pdf[0])
 

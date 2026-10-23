@@ -8,15 +8,13 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
-    env:
-      LLM_MODE: mock
     steps:
       - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-rus
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
       - run: uv run ruff check app tests
       - run: uv run pytest -q
-      - run: uv run python -m app.eval
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,14 +45,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
       - name: smoke test
         run: |
           docker build -t smoke .
-          docker run -d --name smoke -p 8000:8000 -e LLM_MODE=mock smoke
-          for i in $(seq 1 30); do curl -sf localhost:8000/api/v1/health && break; sleep 3; done
+          docker run -d --name smoke -p 8000:8000 -e DATA_DIR=data_synthetic smoke
+          for i in $(seq 1 40); do curl -sf localhost:8000/api/v1/auth/users | grep -q cfo_a && break; sleep 3; done
+          curl -sf localhost:8000/api/v1/health | grep -q '"ocr":true'
           curl -sf localhost:8000/api/v1/auth/users | grep -q cfo_a

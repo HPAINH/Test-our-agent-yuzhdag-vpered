@@ -54,7 +54,10 @@ class Settings(BaseSettings):
 
     @property
     def news_path(self) -> Path:
-        return Path(self.news_dir) if self.news_dir else self.data_path / "news"
+        if self.news_dir:
+            return Path(self.news_dir)
+        own = self.data_path / "news"
+        return own if own.exists() else ROOT / "data_synthetic" / "news"
 
 
 @lru_cache

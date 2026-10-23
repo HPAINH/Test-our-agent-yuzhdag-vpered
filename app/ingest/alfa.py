@@ -16,30 +16,43 @@ PAGE_BREAK = "---page---"
 BOILERPLATE = (
     "все права защищены",
     "несанкционированное копирование",
-    "не является индивидуальной инвестиционной рекомендацией",
-    "генеральная лицензия цб рф",
+    "инвестиционной рекомендацией",
+    "инвестиционному консультированию",
+    "генеральная лицензия",
+    "исключительной собственностью",
+    "строго запрещено",
+    "распространяется исключительно",
+    "в письменной форме",
+    "не предназначен для распространения",
     "контакты и дисклеймер",
-    "не предназначен для распространения среди частных",
 )
 
 
 def _noise_line(line: str) -> bool:
     s = line.strip()
-    if len(s) < 3 or "@" in s:
+    if len(s) < 2 or "@" in s:
         return True
-    letters = sum(ch.isalpha() for ch in s)
-    return letters / len(s) < 0.45
+    letters = [ch for ch in s if ch.isalpha()]
+    if not letters or len(letters) / len(s) < 0.45:
+        return True
+    cyr = sum("а" <= ch.lower() <= "я" or ch.lower() == "ё" for ch in letters)
+    return cyr / len(letters) < 0.6
 
 
 def clean_report_text(text: str) -> str:
+    from app.processing.text import sentences
+
+    low = text.lower()
+    cut = low.find("контакты и дисклеймер")
+    if cut != -1:
+        text = text[:cut]
     paras = []
     for para in re.split(r"\n\s*\n", text):
-        low = para.lower()
-        if any(b in low for b in BOILERPLATE):
-            continue
-        lines = [ln for ln in para.splitlines() if not _noise_line(ln)]
-        if lines:
-            paras.append(" ".join(ln.strip() for ln in lines))
+        lines = [ln.strip() for ln in para.splitlines() if not _noise_line(ln)]
+        joined = re.sub(r"\s+", " ", " ".join(lines)).strip()
+        kept = [x for x in sentences(joined) if not any(b in x.lower() for b in BOILERPLATE)]
+        if kept:
+            paras.append(" ".join(kept))
     merged: list[str] = []
     for p in paras:
         if merged and not merged[-1].endswith((".", "!", "?", ":")):
@@ -49,20 +62,34 @@ def clean_report_text(text: str) -> str:
     return "\n\n".join(m for m in merged if len(m) > 30)
 
 
+def _units(text: str, target_tokens: int) -> list[str]:
+    from app.processing.text import sentences
+
+    out = []
+    for p in (x.strip() for x in re.split(r"\n\s*\n", text)):
+        if not p:
+            continue
+        if len(stems(p, drop_stop=False)) <= target_tokens:
+            out.append(p)
+        else:
+            out.extend(s.strip() for s in sentences(p) if s.strip())
+    return out
+
+
 def chunk_text(text: str, target_tokens: int = 160, overlap_tokens: int = 30) -> list[str]:
-    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    paras = _units(text, target_tokens)
     chunks, current, size = [], [], 0
     for p in paras:
         n = len(stems(p, drop_stop=False))
         if current and size + n > target_tokens:
-            chunks.append("\n\n".join(current))
+            chunks.append(" ".join(current))
             tail = current[-1]
             current = [tail] if len(stems(tail, drop_stop=False)) <= overlap_tokens else []
             size = sum(len(stems(x, drop_stop=False)) for x in current)
         current.append(p)
         size += n
     if current:
-        chunks.append("\n\n".join(current))
+        chunks.append(" ".join(current))
     return chunks
 
 
@@ -90,7 +117,10 @@ def _read_pdf(path: Path) -> tuple[str, datetime | None, list[dict]]:
     meta_title = (pymupdf.open(path).metadata or {}).get("title") or ""
     first_text = pages[0]["text"] if pages else ""
     first_line = next((ln.strip() for ln in first_text.splitlines() if len(ln.strip()) > 10), "")
-    title = meta_title or first_line or path.stem
+    meta = report_meta(path)
+    title = meta.get("title") or meta_title or first_line or path.stem
+    if meta.get("date"):
+        return title, datetime.fromisoformat(str(meta["date"])), pages
     date = None
     m = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", first_text)
     if m:
@@ -99,6 +129,16 @@ def _read_pdf(path: Path) -> tuple[str, datetime | None, list[dict]]:
         except ValueError:
             date = None
     return title, date, pages
+
+
+def report_meta(path: Path) -> dict:
+    import yaml
+
+    index = path.parent / "reports.yaml"
+    if not index.exists():
+        return {}
+    data = yaml.safe_load(index.read_text(encoding="utf-8")) or {}
+    return (data.get("reports") or {}).get(path.name, {})
 
 
 def report_files(alfa_dir: Path) -> list[Path]:

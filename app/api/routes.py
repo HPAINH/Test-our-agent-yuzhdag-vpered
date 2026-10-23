@@ -176,7 +176,7 @@ def _feed_rows(db: Session, user: AppUser, min_score: float, hidden: str = "excl
 def health(db: Session = Depends(get_db)):
     ok_db = db.scalar(select(func.count(AppUser.login))) is not None
     from app.ingest.ocr import ocr_available
-    from app.worker import LAST_CYCLE
+    from app.worker import LAST_CYCLE, STATE
 
     pending = db.scalar(
         select(func.count(Material.id)).where(
@@ -188,7 +188,11 @@ def health(db: Session = Depends(get_db)):
         "db": ok_db,
         "llm": get_llm().budget_state(),
         "ocr": ocr_available(),
-        "pipeline": {"pending_news": pending, "last_cycle": dict(LAST_CYCLE) or None},
+        "pipeline": {
+            "loading_data": STATE["loading_data"],
+            "pending_news": pending,
+            "last_cycle": dict(LAST_CYCLE) or None,
+        },
     }
 
 

@@ -18,20 +18,20 @@ UI_DIST = ROOT / "ui" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.db.session import init_db
     from app.seed import ensure_seeded
 
     settings = get_settings()
-    if settings.seed_on_start:
-        ensure_seeded()
-    else:
-        from app.db.session import init_db
-
-        init_db()
+    init_db()
     sched = None
     if settings.background_jobs:
         from app.worker import start_background
 
-        sched = start_background(settings.news_refresh_min if settings.rss_enabled else 0)
+        sched = start_background(
+            settings.news_refresh_min if settings.rss_enabled else 0, bootstrap=settings.seed_on_start
+        )
+    elif settings.seed_on_start:
+        ensure_seeded()
     yield
     if sched is not None:
         sched.shutdown(wait=False)
